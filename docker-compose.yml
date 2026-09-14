@@ -1,24 +1,44 @@
 version: '3.8'
 
 services:
-  # Self-hosted LiveKit SFU Server
+  # 1. MongoDB Database
+  mongo:
+    image: mongo:6.0
+    restart: always
+    container_name: voicespace_mongo
+    volumes:
+      - mongo_data:/data/db
+    ports:
+      - "27017:27017"
+    networks:
+      - voicespace_net
+
+  # 2. LiveKit SFU Media Server (UDP + WebRTC Engine)
   livekit:
     image: livekit/livekit-server:latest
-    command: --dev
     restart: always
+    container_name: voicespace_livekit
+    command: --dev
     network_mode: "host"
 
-  # Bot + FastAPI Web Server
-  voice-bot:
+  # 3. Bot + FastAPI Web Server
+  voice-app:
     build: .
     restart: always
-    network_mode: "host"
-    environment:
-      - API_ID=${API_ID}
-      - API_HASH=${API_HASH}
-      - BOT_TOKEN=${BOT_TOKEN}
-      - WEBAPP_URL=${WEBAPP_URL}
-      - LIVEKIT_URL=ws://127.0.0.1:7880
-      - LIVEKIT_API_KEY=devkey
-      - LIVEKIT_API_SECRET=secret
-      
+    container_name: voicespace_app
+    depends_on:
+      - mongo
+    env_file:
+      - .env
+    ports:
+      - "8080:8080"
+    networks:
+      - voicespace_net
+
+volumes:
+  mongo_data:
+
+networks:
+  voicespace_net:
+    driver: bridge
+    
