@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Telegram Voice Space</title>
+    <!-- Dynamic Title placeholder -->
+    <title id="app-title">Voice Space</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
@@ -15,19 +16,25 @@
 </head>
 <body class="h-screen flex flex-col justify-between p-4 select-none overflow-hidden">
 
+    <!-- Top Status Bar with Dynamic Group Name -->
     <div class="flex items-center justify-between bg-slate-800/60 backdrop-blur-md p-3 rounded-2xl border border-slate-700/50">
-        <div class="flex items-center gap-2">
-            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span class="text-sm font-semibold text-slate-200" id="room-status">Connecting...</span>
+        <div class="flex items-center gap-2 overflow-hidden">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
+            <div class="flex flex-col truncate">
+                <span class="text-sm font-bold text-white truncate" id="display-group-name">Connecting...</span>
+                <span class="text-[10px] text-slate-400 font-medium" id="room-status">Joining Voice Space</span>
+            </div>
         </div>
-        <button onclick="toggleChatDrawer()" class="p-2 bg-slate-700/50 rounded-xl relative">
+        <button onclick="toggleChatDrawer()" class="p-2 bg-slate-700/50 rounded-xl relative shrink-0">
             <i data-lucide="message-square" class="w-5 h-5 text-slate-300"></i>
             <span id="chat-badge" class="hidden absolute top-1 right-1 w-2 h-2 bg-indigo-500 rounded-full"></span>
         </button>
     </div>
 
+    <!-- Participants Grid -->
     <div id="participants-grid" class="flex-1 grid grid-cols-3 sm:grid-cols-4 gap-4 py-6 auto-rows-max overflow-y-auto items-center justify-center"></div>
 
+    <!-- Controls -->
     <div class="bg-slate-800/80 backdrop-blur-lg p-4 rounded-3xl border border-slate-700/60 flex items-center justify-around max-w-sm mx-auto w-full mb-2">
         <button onclick="handleLeaveClick()" class="p-4 bg-rose-500/20 text-rose-400 rounded-2xl active:scale-95 transition">
             <i data-lucide="phone-off" class="w-6 h-6"></i>
@@ -40,6 +47,7 @@
         </button>
     </div>
 
+    <!-- Profile & Moderation Modal -->
     <div id="profile-modal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div class="bg-slate-800 border border-slate-700 w-full max-w-xs rounded-3xl p-6 text-center space-y-4">
             <img id="modal-img" class="w-20 h-20 rounded-full mx-auto border-2 border-indigo-500 object-cover bg-slate-700" src="" alt="">
@@ -61,6 +69,7 @@
         </div>
     </div>
 
+    <!-- Admin Leave Modal -->
     <div id="admin-leave-modal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div class="bg-slate-800 border border-slate-700 w-full max-w-xs rounded-3xl p-6 text-center space-y-4">
             <h3 class="font-bold text-white text-base">Leave Voice Space</h3>
@@ -73,6 +82,7 @@
         </div>
     </div>
 
+    <!-- Chat Drawer -->
     <div id="chat-drawer" class="hidden fixed inset-0 bg-slate-900 z-40 flex flex-col p-4">
         <div class="flex items-center justify-between pb-3 border-b border-slate-800">
             <h3 class="font-bold text-sm text-slate-200">Room Chat</h3>
@@ -98,7 +108,10 @@
         let currentChatId = new URLSearchParams(window.location.search).get('chat_id');
 
         async function initVoice() {
-            if (!currentChatId || !tg?.initData) return;
+            if (!currentChatId || !tg?.initData) {
+                document.getElementById('room-status').innerText = "Missing parameters";
+                return;
+            }
             try {
                 const res = await fetch('/api/get-token', {
                     method: 'POST',
@@ -109,9 +122,14 @@
                 myIsAdmin = data.is_admin;
                 myIsOwner = data.is_owner;
 
+                // Dynamically set Group Title everywhere
+                const groupTitle = data.group_title || "Voice Space";
+                document.title = groupTitle;
+                document.getElementById('display-group-name').innerText = groupTitle;
+
                 room = new LivekitClient.Room({ adaptiveStream: true, dynacast: true });
                 await room.connect(data.livekit_url, data.token);
-                document.getElementById('room-status').innerText = "Connected (HD)";
+                document.getElementById('room-status').innerText = "HD Connected";
                 await room.localParticipant.setMicrophoneEnabled(true);
 
                 setupRoomEvents();
@@ -126,6 +144,9 @@
             room.on(LivekitClient.RoomEvent.ParticipantDisconnected, updateParticipantsGrid);
             room.on(LivekitClient.RoomEvent.ActiveSpeakersChanged, handleActiveSpeakers);
             room.on(LivekitClient.RoomEvent.DataReceived, handleIncomingData);
+            room.on(LivekitClient.RoomEvent.Disconnected, () => {
+                tg?.close ? tg.close() : window.close();
+            });
         }
 
         function updateParticipantsGrid() {
@@ -222,7 +243,6 @@
             const actionsBox = document.getElementById('admin-actions-box');
             const isTargetSelf = participant.identity === room.localParticipant.identity;
 
-            // GOD MODE: Owner can kick/mute ANYONE (including regular admins), but admins cannot touch owner or other admins.
             const canModerate = myIsOwner || (myIsAdmin && !meta.is_owner && !meta.is_admin);
 
             if (canModerate && !isTargetSelf) {
