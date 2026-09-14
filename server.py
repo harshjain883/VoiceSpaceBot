@@ -5,7 +5,7 @@ import json
 from urllib.parse import parse_qsl
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Header
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,6 +20,10 @@ BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 LIVEKIT_URL = os.getenv("LIVEKIT_URL", "")
 LIVEKIT_API_KEY = os.getenv("LIVEKIT_API_KEY", "")
 LIVEKIT_API_SECRET = os.getenv("LIVEKIT_API_SECRET", "")
+
+# Load Owner IDs
+raw_owners = os.getenv("OWNER_ID", "")
+OWNER_IDS = [int(x.strip()) for x in raw_owners.split(",") if x.strip().isdigit()]
 
 app = FastAPI(title="Telegram Voice Space Server")
 
@@ -36,12 +40,9 @@ STATIC_DIR = BASE_DIR / "static"
 if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
-# Shared storage for active rooms & admins (Populated by bot)
-# Format: { chat_id: [admin_user_id1, admin_user_id2] }
 ACTIVE_ROOMS = {}
 
 def verify_telegram_init_data(init_data: str) -> dict:
-    """Verifies Telegram WebApp initData HMAC-SHA256 signature."""
     try:
         parsed_data = dict(parse_qsl(init_data, keep_blank_values=True))
         hash_to_check = parsed_data.pop("hash", None)
@@ -55,14 +56,22 @@ def verify_telegram_init_data(init_data: str) -> dict:
         if not hmac.compare_digest(calculated_hash, hash_to_check):
             raise ValueError("Hash mismatch")
 
-        user_info = json.loads(parsed_data.get("user", "{}"))
-        return user_info
+        return json.loads(parsed_data.get("user", "{}"))
     except Exception as e:
         raise HTTPException(status_code=401, detail=f"Invalid Telegram authentication: {e}")
+
 
 class JoinRequest(BaseModel):
     chat_id: str
     init_data: str
+
+
+class ModerateRequest(BaseModel):
+    chat_id: str
+    init_data: str
+    target_user_id: int
+    action: str  # "mute" or "kick"
+
 
 @app.get("/")
 async def index():
@@ -71,9 +80,11 @@ async def index():
         return FileResponse(str(index_file))
     return {"status": "running"}
 
+
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
 
 @app.post("/api/get-token")
 async def get_token(req: JoinRequest):
@@ -85,19 +96,21 @@ async def get_token(req: JoinRequest):
 
     chat_id = req.chat_id
     room_admins = ACTIVE_ROOMS.get(str(chat_id), [])
-    is_admin = user_id in room_admins
+    
+    # Check roles
+    is_owner = user_id in OWNER_IDS
+    is_admin = is_owner or (user_id in room_admins)
 
-    # Generate LiveKit Token
     token = api.AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET)
     token.with_identity(str(user_id))
     token.with_name(name)
     token.with_metadata(json.dumps({
         "username": username,
         "photo_url": photo_url,
-        "is_admin": is_admin
+        "is_admin": is_admin,
+        "is_owner": is_owner
     }))
 
-    # Admin gets full rights, normal users get standard speak rights
     grant = api.VideoGrant(
         room_join=True,
         room=f"room_{chat_id}",
@@ -111,6 +124,7 @@ async def get_token(req: JoinRequest):
         "token": token.to_jwt(),
         "livekit_url": LIVEKIT_URL,
         "is_admin": is_admin,
+        "is_owner": is_owner,
         "user_info": {
             "id": user_id,
             "name": name,
@@ -119,6 +133,51 @@ async def get_token(req: JoinRequest):
         }
     }
 
+
+@app.post("/api/moderate-user")
+async def moderate_user(req: ModerateRequest):
+    caller = verify_telegram_init_data(req.init_data)
+    caller_id = caller.get("id")
+    chat_id = req.chat_id
+    target_id = req.target_user_id
+
+    # 1. IMMUNITY CHECK: Owner cannot be kicked or muted by anyone
+    if target_id in OWNER_IDS:
+        raise HTTPException(
+            status_code=403, 
+            detail="Forbidden: Bot Owner has full immunity and cannot be muted or kicked!"
+        )
+
+    # 2. Check if caller is admin or owner
+    room_admins = ACTIVE_ROOMS.get(str(chat_id), [])
+    caller_is_admin = (caller_id in OWNER_IDS) or (caller_id in room_admins)
+    if not caller_is_admin:
+        raise HTTPException(status_code=403, detail="Only admins can moderate users")
+
+    lk_api = api.LiveKitAPI(LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET)
+    try:
+        room_name = f"room_{chat_id}"
+        if req.action == "kick":
+            await lk_api.room.remove_participant(
+                api.RoomParticipantIdentity(room=room_name, identity=str(target_id))
+            )
+            return {"status": "kicked"}
+        elif req.action == "mute":
+            await lk_api.room.mute_published_track(
+                api.MuteRoomTrackRequest(
+                    room=room_name,
+                    identity=str(target_id),
+                    track_sid="",  # Mute all microphone tracks
+                    muted=True
+                )
+            )
+            return {"status": "muted"}
+        else:
+            raise HTTPException(status_code=400, detail="Invalid action")
+    finally:
+        await lk_api.aclose()
+
+
 @app.post("/api/end-room")
 async def end_room(req: JoinRequest):
     user = verify_telegram_init_data(req.init_data)
@@ -126,10 +185,9 @@ async def end_room(req: JoinRequest):
     chat_id = req.chat_id
 
     room_admins = ACTIVE_ROOMS.get(str(chat_id), [])
-    if user_id not in room_admins:
+    if (user_id not in OWNER_IDS) and (user_id not in room_admins):
         raise HTTPException(status_code=403, detail="Only admins can end this room")
 
-    # Terminate LiveKit Room
     lk_api = api.LiveKitAPI(LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET)
     try:
         await lk_api.room.delete_room(api.DeleteRoomRequest(room=f"room_{chat_id}"))
@@ -138,4 +196,4 @@ async def end_room(req: JoinRequest):
         await lk_api.aclose()
 
     return {"status": "room_closed"}
-  
+    
