@@ -31,11 +31,13 @@ bot = Client(
     bot_token=BOT_TOKEN
 )
 
-@bot.on_message(filters.command("vc") & (filters.group | filters.supergroup))
+# FIXED: filters.group handles both normal groups and supergroups in Pyrogram
+@bot.on_message(filters.command("vc") & filters.group)
 async def start_vc_command(client: Client, message: types.Message):
     chat = message.chat
     caller_id = message.from_user.id
 
+    # 1. Verify Bot's Admin Rights and "can_invite_users" Privilege
     bot_member = await chat.get_member("me")
     if bot_member.status != ChatMemberStatus.ADMINISTRATOR:
         return await message.reply_text(
@@ -51,6 +53,7 @@ async def start_vc_command(client: Client, message: types.Message):
             "Admin Settings mein jaakar yeh permission enable karein!"
         )
 
+    # 2. Verify Caller is Admin or Owner
     caller_member = await chat.get_member(caller_id)
     is_owner = caller_id in OWNER_IDS
     is_admin = caller_member.status in [ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER]
@@ -58,6 +61,7 @@ async def start_vc_command(client: Client, message: types.Message):
     if not is_owner and not is_admin:
         return await message.reply_text("❌ Sirf group administrators hi Voice Space start kar sakte hain.")
 
+    # 3. Retrieve or Create Group Invite Link
     invite_link = chat.invite_link
     if not invite_link:
         try:
@@ -66,10 +70,12 @@ async def start_vc_command(client: Client, message: types.Message):
         except RPCError:
             invite_link = f"https://t.me/{chat.username}" if chat.username else "No link accessible"
 
+    # 4. Extract Admins
     admin_ids = []
     async for member in chat.get_members(filter=ChatMembersFilter.ADMINISTRATORS):
         admin_ids.append(member.user.id)
 
+    # 5. Persist to MongoDB
     await set_room(
         chat_id=str(chat.id),
         title=chat.title,
