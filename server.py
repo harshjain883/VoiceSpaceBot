@@ -6,13 +6,14 @@ from urllib.parse import parse_qsl
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
 from livekit import api
+from db import get_room, delete_room
 
 load_dotenv()
 
@@ -39,9 +40,6 @@ STATIC_DIR = BASE_DIR / "static"
 if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
-# Format: { chat_id: {"title": group_title, "admins": [id1, ...]} }
-ACTIVE_ROOMS = {}
-
 def verify_telegram_init_data(init_data: str) -> dict:
     try:
         parsed_data = dict(parse_qsl(init_data, keep_blank_values=True))
@@ -55,7 +53,7 @@ def verify_telegram_init_data(init_data: str) -> dict:
             raise ValueError("Hash mismatch")
         return json.loads(parsed_data.get("user", "{}"))
     except Exception as e:
-        raise HTTPException(status_code=401, detail=f"Invalid auth: {e}")
+        raise HTTPException(status_code=401, detail=f"Invalid Telegram authentication: {e}")
 
 class JoinRequest(BaseModel):
     chat_id: str
@@ -65,7 +63,7 @@ class ModerateRequest(BaseModel):
     chat_id: str
     init_data: str
     target_user_id: int
-    action: str  # "mute" or "kick"
+    action: str
 
 @app.get("/")
 async def index():
@@ -87,8 +85,8 @@ async def get_token(req: JoinRequest):
     photo_url = user.get("photo_url", "")
 
     chat_id = str(req.chat_id)
-    room_data = ACTIVE_ROOMS.get(chat_id, {"admins": []})
-    room_admins = room_data.get("admins", [])
+    room_data = await get_room(chat_id)
+    room_admins = room_data.get("admins", []) if room_data else []
 
     is_owner = user_id in OWNER_IDS
     is_admin = is_owner or (user_id in room_admins)
@@ -126,8 +124,8 @@ async def moderate_user(req: ModerateRequest):
     chat_id = str(req.chat_id)
     target_id = req.target_user_id
 
-    room_data = ACTIVE_ROOMS.get(chat_id, {"admins": []})
-    room_admins = room_data.get("admins", [])
+    room_data = await get_room(chat_id)
+    room_admins = room_data.get("admins", []) if room_data else []
 
     caller_is_owner = caller_id in OWNER_IDS
     caller_is_admin = caller_is_owner or (caller_id in room_admins)
@@ -135,10 +133,8 @@ async def moderate_user(req: ModerateRequest):
     if not caller_is_admin:
         raise HTTPException(status_code=403, detail="Unauthorized")
 
-    # Target immunity check: Only Owner can override anyone (even group admins), 
-    # and nobody can moderate the Owner.
     if target_id in OWNER_IDS:
-        raise HTTPException(status_code=403, detail="Cannot moderate Bot Owner!")
+        raise HTTPException(status_code=403, detail="Forbidden: Bot Owner cannot be moderated!")
 
     if not caller_is_owner and target_id in room_admins:
         raise HTTPException(status_code=403, detail="Regular admins cannot moderate other admins!")
@@ -147,15 +143,24 @@ async def moderate_user(req: ModerateRequest):
     try:
         room_name = f"room_{chat_id}"
         if req.action == "kick":
-            await lk_api.room.remove_participant(api.RoomParticipantIdentity(room=room_name, identity=str(target_id)))
+            await lk_api.room.remove_participant(
+                api.RoomParticipantIdentity(room=room_name, identity=str(target_id))
+            )
             return {"status": "kicked"}
         elif req.action == "mute":
-            await lk_api.room.mute_published_track(api.MuteRoomTrackRequest(room=room_name, identity=str(target_id), track_sid="", muted=True))
+            await lk_api.room.mute_published_track(
+                api.MuteRoomTrackRequest(
+                    room=room_name,
+                    identity=str(target_id),
+                    track_sid="",
+                    muted=True
+                )
+            )
             return {"status": "muted"}
+        else:
+            raise HTTPException(status_code=400, detail="Invalid action")
     finally:
         await lk_api.aclose()
-
-    return {"status": "success"}
 
 @app.post("/api/end-room")
 async def end_room(req: JoinRequest):
@@ -163,9 +168,9 @@ async def end_room(req: JoinRequest):
     user_id = user.get("id")
     chat_id = str(req.chat_id)
 
-    room_data = ACTIVE_ROOMS.get(chat_id, {"admins": []})
+    room_data = await get_room(chat_id)
     is_owner = user_id in OWNER_IDS
-    is_admin = is_owner or (user_id in room_data.get("admins", []))
+    is_admin = is_owner or (user_id in (room_data.get("admins", []) if room_data else []))
 
     if not is_admin:
         raise HTTPException(status_code=403, detail="Unauthorized")
@@ -173,7 +178,7 @@ async def end_room(req: JoinRequest):
     lk_api = api.LiveKitAPI(LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET)
     try:
         await lk_api.room.delete_room(api.DeleteRoomRequest(room=f"room_{chat_id}"))
-        ACTIVE_ROOMS.pop(chat_id, None)
+        await delete_room(chat_id)
     finally:
         await lk_api.aclose()
 
