@@ -144,6 +144,9 @@ async def owner_active_vc_panel(client: Client, message: types.Message):
     finally:
         await lk_api.aclose()
 
+# bot.py ke last lines ko replace karein:
 if __name__ == "__main__":
+    print("---------------------------------------")
+    print(">>> Voice Space Pyrogram Bot Started! <<<")
+    print("---------------------------------------")
     bot.run()
-    
