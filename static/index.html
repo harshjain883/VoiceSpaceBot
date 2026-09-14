@@ -27,38 +27,45 @@
         </button>
     </div>
 
-    <!-- Voice Participants Grid -->
+    <!-- Participants Grid -->
     <div id="participants-grid" class="flex-1 grid grid-cols-3 sm:grid-cols-4 gap-4 py-6 auto-rows-max overflow-y-auto items-center justify-center">
-        <!-- Rendered dynamically -->
     </div>
 
-    <!-- Bottom Controls Bar -->
+    <!-- Bottom Controls -->
     <div class="bg-slate-800/80 backdrop-blur-lg p-4 rounded-3xl border border-slate-700/60 flex items-center justify-around max-w-sm mx-auto w-full mb-2">
-        <!-- Leave Button -->
         <button onclick="handleLeaveClick()" class="p-4 bg-rose-500/20 text-rose-400 rounded-2xl active:scale-95 transition">
             <i data-lucide="phone-off" class="w-6 h-6"></i>
         </button>
-
-        <!-- Mic Button -->
         <button id="mic-btn" onclick="toggleMic()" class="p-5 bg-indigo-600 text-white rounded-full active:scale-95 transition shadow-lg shadow-indigo-500/30">
             <i id="mic-icon" data-lucide="mic" class="w-7 h-7"></i>
         </button>
-
-        <!-- Speaker Mute output -->
         <button onclick="toggleSpeaker()" id="speaker-btn" class="p-4 bg-slate-700/60 text-slate-300 rounded-2xl active:scale-95 transition">
             <i id="speaker-icon" data-lucide="volume-2" class="w-6 h-6"></i>
         </button>
     </div>
 
-    <!-- Profile Popup Modal -->
+    <!-- Profile & Moderation Modal -->
     <div id="profile-modal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div class="bg-slate-800 border border-slate-700 w-full max-w-xs rounded-3xl p-6 text-center space-y-4">
             <img id="modal-img" class="w-20 h-20 rounded-full mx-auto border-2 border-indigo-500 object-cover bg-slate-700" src="" alt="">
             <div>
                 <h3 id="modal-name" class="font-bold text-lg text-white"></h3>
-                <p id="modal-role" class="text-xs text-indigo-400 font-semibold uppercase mt-0.5"></p>
+                <p id="modal-role" class="text-xs font-bold uppercase mt-0.5"></p>
                 <p id="modal-username" class="text-xs text-slate-400 mt-1"></p>
             </div>
+
+            <!-- Admin Moderation Controls (Hidden for Owner) -->
+            <div id="admin-actions-box" class="hidden space-y-2 pt-2 border-t border-slate-700/60">
+                <div class="grid grid-cols-2 gap-2">
+                    <button id="btn-mod-mute" class="p-2.5 bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 rounded-xl text-xs font-semibold">
+                        Mute User
+                    </button>
+                    <button id="btn-mod-kick" class="p-2.5 bg-rose-500/20 text-rose-300 hover:bg-rose-500/30 rounded-xl text-xs font-semibold">
+                        Kick User
+                    </button>
+                </div>
+            </div>
+
             <button id="modal-open-tg" class="w-full p-3 bg-indigo-600 hover:bg-indigo-500 rounded-xl font-semibold text-white text-sm transition">
                 Open Telegram Profile
             </button>
@@ -66,11 +73,11 @@
         </div>
     </div>
 
-    <!-- Admin Leave/End Room Modal -->
+    <!-- Admin Leave Modal -->
     <div id="admin-leave-modal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div class="bg-slate-800 border border-slate-700 w-full max-w-xs rounded-3xl p-6 text-center space-y-4">
             <h3 class="font-bold text-white text-base">Leave Voice Space</h3>
-            <p class="text-xs text-slate-400">You are an admin. Do you want to leave or terminate the voice space for everyone?</p>
+            <p class="text-xs text-slate-400">Do you want to leave or end the voice chat for everyone?</p>
             <div class="space-y-2">
                 <button onclick="leaveRoom(false)" class="w-full p-3 bg-slate-700 hover:bg-slate-600 rounded-xl text-sm font-semibold text-white">Leave Space</button>
                 <button onclick="leaveRoom(true)" class="w-full p-3 bg-rose-600 hover:bg-rose-500 rounded-xl text-sm font-semibold text-white">End Space for All</button>
@@ -79,7 +86,7 @@
         </div>
     </div>
 
-    <!-- In-Room Chat Drawer -->
+    <!-- Chat Drawer -->
     <div id="chat-drawer" class="hidden fixed inset-0 bg-slate-900 z-40 flex flex-col p-4">
         <div class="flex items-center justify-between pb-3 border-b border-slate-800">
             <h3 class="font-bold text-sm text-slate-200">Room Chat</h3>
@@ -95,19 +102,14 @@
     <script>
         const tg = window.Telegram?.WebApp;
         if (tg) { tg.ready(); tg.expand(); }
-
         lucide.createIcons();
 
         let room = null;
         let isMicEnabled = true;
         let isSpeakerEnabled = true;
-        let isAdmin = false;
-        let currentChatId = "";
-        let participantsMap = new Map();
-
-        // Extract chat_id from URL
-        const urlParams = new URLSearchParams(window.location.search);
-        currentChatId = urlParams.get('chat_id');
+        let myIsAdmin = false;
+        let myIsOwner = false;
+        let currentChatId = new URLSearchParams(window.location.search).get('chat_id');
 
         async function initVoice() {
             if (!currentChatId || !tg?.initData) {
@@ -124,32 +126,23 @@
 
                 if (!res.ok) throw new Error("Auth Failed");
                 const data = await res.json();
-                isAdmin = data.is_admin;
+                myIsAdmin = data.is_admin;
+                myIsOwner = data.is_owner;
 
-                // Connect to LiveKit SFU (Works for both Cloud and Self-Hosted)
                 room = new LivekitClient.Room({
                     adaptiveStream: true,
                     dynacast: true,
-                    audioCaptureDefaults: {
-                        autoGainControl: true,
-                        echoCancellation: true,
-                        noiseSuppression: true
-                    }
+                    audioCaptureDefaults: { autoGainControl: true, echoCancellation: true, noiseSuppression: true }
                 });
 
                 await room.connect(data.livekit_url, data.token);
                 document.getElementById('room-status').innerText = "Connected (HD)";
-
-                // Enable mic initially
                 await room.localParticipant.setMicrophoneEnabled(true);
 
-                // Setup listeners
                 setupRoomEvents();
                 updateParticipantsGrid();
-
             } catch (err) {
                 document.getElementById('room-status').innerText = "Connection Failed";
-                console.error(err);
             }
         }
 
@@ -166,7 +159,6 @@
         function updateParticipantsGrid() {
             const grid = document.getElementById('participants-grid');
             grid.innerHTML = "";
-
             const allParticipants = [room.localParticipant, ...Array.from(room.remoteParticipants.values())];
 
             allParticipants.forEach(p => {
@@ -179,7 +171,7 @@
 
                 const avatarWrapper = document.createElement('div');
                 avatarWrapper.id = `avatar-${p.identity}`;
-                avatarWrapper.className = "relative w-14 h-14 rounded-full border-2 border-slate-700 flex items-center justify-center bg-slate-800 transition duration-200 overflow-hidden";
+                avatarWrapper.className = `relative w-14 h-14 rounded-full border-2 ${meta.is_owner ? 'border-amber-400 shadow-md shadow-amber-500/20' : 'border-slate-700'} flex items-center justify-center bg-slate-800 transition duration-200 overflow-hidden`;
 
                 if (meta.photo_url) {
                     avatarWrapper.innerHTML = `<img src="${meta.photo_url}" class="w-full h-full object-cover">`;
@@ -187,13 +179,12 @@
                     avatarWrapper.innerHTML = `<span class="font-bold text-sm text-indigo-300">${(p.name || "U")[0]}</span>`;
                 }
 
-                // Mic muted indicator
-                const isMuted = !p.isSpeaking && p.audioTrackPublications?.size > 0 && Array.from(p.audioTrackPublications.values())[0]?.isMuted;
-                if (isMuted) {
-                    const muteBadge = document.createElement('div');
-                    muteBadge.className = "absolute bottom-0 right-0 p-1 bg-rose-600 rounded-full text-white";
-                    muteBadge.innerHTML = `<i data-lucide="mic-off" class="w-2.5 h-2.5"></i>`;
-                    avatarWrapper.appendChild(muteBadge);
+                // Crown badge for Bot Owner
+                if (meta.is_owner) {
+                    const crown = document.createElement('div');
+                    crown.className = "absolute top-0 right-0 p-0.5 bg-amber-500 rounded-full text-black text-[9px]";
+                    crown.innerHTML = `👑`;
+                    avatarWrapper.appendChild(crown);
                 }
 
                 const nameTag = document.createElement('span');
@@ -220,31 +211,22 @@
             await room.localParticipant.setMicrophoneEnabled(isMicEnabled);
             const btn = document.getElementById('mic-btn');
             const icon = document.getElementById('mic-icon');
-            if (isMicEnabled) {
-                btn.className = "p-5 bg-indigo-600 text-white rounded-full active:scale-95 transition shadow-lg shadow-indigo-500/30";
-                icon.setAttribute("data-lucide", "mic");
-            } else {
-                btn.className = "p-5 bg-rose-600 text-white rounded-full active:scale-95 transition shadow-lg shadow-rose-500/30";
-                icon.setAttribute("data-lucide", "mic-off");
-            }
+            btn.className = isMicEnabled ? "p-5 bg-indigo-600 text-white rounded-full active:scale-95 transition shadow-lg shadow-indigo-500/30" : "p-5 bg-rose-600 text-white rounded-full active:scale-95 transition shadow-lg shadow-rose-500/30";
+            icon.setAttribute("data-lucide", isMicEnabled ? "mic" : "mic-off");
             lucide.createIcons();
-            updateParticipantsGrid();
         }
 
         function toggleSpeaker() {
             isSpeakerEnabled = !isSpeakerEnabled;
             room.remoteParticipants.forEach(p => {
-                p.audioTrackPublications.forEach(pub => {
-                    if (pub.track) pub.track.setVolume(isSpeakerEnabled ? 1 : 0);
-                });
+                p.audioTrackPublications.forEach(pub => { if (pub.track) pub.track.setVolume(isSpeakerEnabled ? 1 : 0); });
             });
-            const icon = document.getElementById('speaker-icon');
-            icon.setAttribute("data-lucide", isSpeakerEnabled ? "volume-2" : "volume-x");
+            document.getElementById('speaker-icon').setAttribute("data-lucide", isSpeakerEnabled ? "volume-2" : "volume-x");
             lucide.createIcons();
         }
 
         function handleLeaveClick() {
-            if (isAdmin) {
+            if (myIsAdmin || myIsOwner) {
                 document.getElementById('admin-leave-modal').classList.remove('hidden');
             } else {
                 leaveRoom(false);
@@ -269,12 +251,35 @@
 
         function openProfileModal(participant, meta) {
             document.getElementById('modal-name').innerText = participant.name || "User";
-            document.getElementById('modal-role').innerText = meta.is_admin ? "Group Admin" : "Member";
+            const roleEl = document.getElementById('modal-role');
+            
+            if (meta.is_owner) {
+                roleEl.innerText = "👑 BOT OWNER (IMMUNE)";
+                roleEl.className = "text-xs font-bold uppercase mt-0.5 text-amber-400";
+            } else if (meta.is_admin) {
+                roleEl.innerText = "Group Admin";
+                roleEl.className = "text-xs font-semibold uppercase mt-0.5 text-indigo-400";
+            } else {
+                roleEl.innerText = "Member";
+                roleEl.className = "text-xs font-semibold uppercase mt-0.5 text-slate-400";
+            }
+
             document.getElementById('modal-username').innerText = meta.username ? `@${meta.username}` : `ID: ${participant.identity}`;
             document.getElementById('modal-img').src = meta.photo_url || "https://telegram.org/img/t_logo.png";
 
-            const btn = document.getElementById('modal-open-tg');
-            btn.onclick = () => {
+            const actionsBox = document.getElementById('admin-actions-box');
+            
+            // STRICT CHECK: Hide moderation buttons if target is OWNER or if viewer is not admin/owner
+            const isTargetSelf = participant.identity === room.localParticipant.identity;
+            if ((myIsAdmin || myIsOwner) && !meta.is_owner && !isTargetSelf) {
+                actionsBox.classList.remove('hidden');
+                document.getElementById('btn-mod-mute').onclick = () => moderateAction(participant.identity, 'mute');
+                document.getElementById('btn-mod-kick').onclick = () => moderateAction(participant.identity, 'kick');
+            } else {
+                actionsBox.classList.add('hidden');
+            }
+
+            document.getElementById('modal-open-tg').onclick = () => {
                 if (meta.username) tg?.openTelegramLink(`https://t.me/${meta.username}`);
                 else tg?.openTelegramLink(`tg://user?id=${participant.identity}`);
             };
@@ -282,13 +287,36 @@
             document.getElementById('profile-modal').classList.remove('hidden');
         }
 
+        async function moderateAction(targetId, action) {
+            try {
+                const res = await fetch('/api/moderate-user', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        chat_id: currentChatId,
+                        init_data: tg.initData,
+                        target_user_id: parseInt(targetId),
+                        action: action
+                    })
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    alert(data.detail || "Action failed");
+                } else {
+                    closeProfileModal();
+                    updateParticipantsGrid();
+                }
+            } catch(e) {
+                alert("Network error: " + e.message);
+            }
+        }
+
         function closeProfileModal() {
             document.getElementById('profile-modal').classList.add('hidden');
         }
 
         function toggleChatDrawer() {
-            const el = document.getElementById('chat-drawer');
-            el.classList.toggle('hidden');
+            document.getElementById('chat-drawer').classList.toggle('hidden');
             document.getElementById('chat-badge').classList.add('hidden');
         }
 
@@ -299,7 +327,6 @@
 
             const payload = JSON.stringify({ name: room.localParticipant.name, msg: txt });
             room.localParticipant.publishData(new TextEncoder().encode(payload), { reliable: true });
-
             appendMsg(room.localParticipant.name, txt, true);
             input.value = "";
         }
@@ -323,7 +350,6 @@
             box.scrollTop = box.scrollHeight;
         }
 
-        // Start
         initVoice();
     </script>
 </body>
