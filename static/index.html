@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Telegram Voice Space</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/livekit-client/dist/livekit-client.umd.min.js"></script>
+    <style>
+        body { background: #0f172a; color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        .speaker-active { box-shadow: 0 0 0 3px #10b981, 0 0 15px rgba(16, 185, 129, 0.6); }
+    </style>
+</head>
+<body class="h-screen flex flex-col justify-between p-4 select-none overflow-hidden">
+
+    <!-- Top Bar -->
+    <div class="flex items-center justify-between bg-slate-800/60 backdrop-blur-md p-3 rounded-2xl border border-slate-700/50">
+        <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span class="text-sm font-semibold text-slate-200" id="room-status">Connecting...</span>
+        </div>
+        <button onclick="toggleChatDrawer()" class="p-2 bg-slate-700/50 rounded-xl relative">
+            <i data-lucide="message-square" class="w-5 h-5 text-slate-300"></i>
+            <span id="chat-badge" class="hidden absolute top-1 right-1 w-2 h-2 bg-indigo-500 rounded-full"></span>
+        </button>
+    </div>
+
+    <!-- Voice Participants Grid -->
+    <div id="participants-grid" class="flex-1 grid grid-cols-3 sm:grid-cols-4 gap-4 py-6 auto-rows-max overflow-y-auto items-center justify-center">
+        <!-- Rendered dynamically -->
+    </div>
+
+    <!-- Bottom Controls Bar -->
+    <div class="bg-slate-800/80 backdrop-blur-lg p-4 rounded-3xl border border-slate-700/60 flex items-center justify-around max-w-sm mx-auto w-full mb-2">
+        <!-- Leave Button -->
+        <button onclick="handleLeaveClick()" class="p-4 bg-rose-500/20 text-rose-400 rounded-2xl active:scale-95 transition">
+            <i data-lucide="phone-off" class="w-6 h-6"></i>
+        </button>
+
+        <!-- Mic Button -->
+        <button id="mic-btn" onclick="toggleMic()" class="p-5 bg-indigo-600 text-white rounded-full active:scale-95 transition shadow-lg shadow-indigo-500/30">
+            <i id="mic-icon" data-lucide="mic" class="w-7 h-7"></i>
+        </button>
+
+        <!-- Speaker Mute output -->
+        <button onclick="toggleSpeaker()" id="speaker-btn" class="p-4 bg-slate-700/60 text-slate-300 rounded-2xl active:scale-95 transition">
+            <i id="speaker-icon" data-lucide="volume-2" class="w-6 h-6"></i>
+        </button>
+    </div>
+
+    <!-- Profile Popup Modal -->
+    <div id="profile-modal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-800 border border-slate-700 w-full max-w-xs rounded-3xl p-6 text-center space-y-4">
+            <img id="modal-img" class="w-20 h-20 rounded-full mx-auto border-2 border-indigo-500 object-cover bg-slate-700" src="" alt="">
+            <div>
+                <h3 id="modal-name" class="font-bold text-lg text-white"></h3>
+                <p id="modal-role" class="text-xs text-indigo-400 font-semibold uppercase mt-0.5"></p>
+                <p id="modal-username" class="text-xs text-slate-400 mt-1"></p>
+            </div>
+            <button id="modal-open-tg" class="w-full p-3 bg-indigo-600 hover:bg-indigo-500 rounded-xl font-semibold text-white text-sm transition">
+                Open Telegram Profile
+            </button>
+            <button onclick="closeProfileModal()" class="w-full p-2 text-slate-400 text-xs">Close</button>
+        </div>
+    </div>
+
+    <!-- Admin Leave/End Room Modal -->
+    <div id="admin-leave-modal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-800 border border-slate-700 w-full max-w-xs rounded-3xl p-6 text-center space-y-4">
+            <h3 class="font-bold text-white text-base">Leave Voice Space</h3>
+            <p class="text-xs text-slate-400">You are an admin. Do you want to leave or terminate the voice space for everyone?</p>
+            <div class="space-y-2">
+                <button onclick="leaveRoom(false)" class="w-full p-3 bg-slate-700 hover:bg-slate-600 rounded-xl text-sm font-semibold text-white">Leave Space</button>
+                <button onclick="leaveRoom(true)" class="w-full p-3 bg-rose-600 hover:bg-rose-500 rounded-xl text-sm font-semibold text-white">End Space for All</button>
+            </div>
+            <button onclick="closeAdminLeaveModal()" class="w-full p-1 text-slate-400 text-xs">Cancel</button>
+        </div>
+    </div>
+
+    <!-- In-Room Chat Drawer -->
+    <div id="chat-drawer" class="hidden fixed inset-0 bg-slate-900 z-40 flex flex-col p-4">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+            <h3 class="font-bold text-sm text-slate-200">Room Chat</h3>
+            <button onclick="toggleChatDrawer()" class="text-slate-400 p-1"><i data-lucide="x" class="w-5 h-5"></i></button>
+        </div>
+        <div id="chat-messages" class="flex-1 overflow-y-auto py-3 space-y-2 text-xs"></div>
+        <div class="flex gap-2 pt-2 border-t border-slate-800">
+            <input id="chat-input" type="text" placeholder="Type a message..." class="flex-1 p-3 rounded-xl bg-slate-800 text-white text-xs outline-none">
+            <button onclick="sendChatMessage()" class="p-3 bg-indigo-600 text-white rounded-xl"><i data-lucide="send" class="w-4 h-4"></i></button>
+        </div>
+    </div>
+
+    <script>
+        const tg = window.Telegram?.WebApp;
+        if (tg) { tg.ready(); tg.expand(); }
+
+        lucide.createIcons();
+
+        let room = null;
+        let isMicEnabled = true;
+        let isSpeakerEnabled = true;
+        let isAdmin = false;
+        let currentChatId = "";
+        let participantsMap = new Map();
+
+        // Extract chat_id from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        currentChatId = urlParams.get('chat_id');
+
+        async function initVoice() {
+            if (!currentChatId || !tg?.initData) {
+                document.getElementById('room-status').innerText = "Missing parameters";
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/get-token', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ chat_id: currentChatId, init_data: tg.initData })
+                });
+
+                if (!res.ok) throw new Error("Auth Failed");
+                const data = await res.json();
+                isAdmin = data.is_admin;
+
+                // Connect to LiveKit SFU (Works for both Cloud and Self-Hosted)
+                room = new LivekitClient.Room({
+                    adaptiveStream: true,
+                    dynacast: true,
+                    audioCaptureDefaults: {
+                        autoGainControl: true,
+                        echoCancellation: true,
+                        noiseSuppression: true
+                    }
+                });
+
+                await room.connect(data.livekit_url, data.token);
+                document.getElementById('room-status').innerText = "Connected (HD)";
+
+                // Enable mic initially
+                await room.localParticipant.setMicrophoneEnabled(true);
+
+                // Setup listeners
+                setupRoomEvents();
+                updateParticipantsGrid();
+
+            } catch (err) {
+                document.getElementById('room-status').innerText = "Connection Failed";
+                console.error(err);
+            }
+        }
+
+        function setupRoomEvents() {
+            room.on(LivekitClient.RoomEvent.ParticipantConnected, updateParticipantsGrid);
+            room.on(LivekitClient.RoomEvent.ParticipantDisconnected, updateParticipantsGrid);
+            room.on(LivekitClient.RoomEvent.ActiveSpeakersChanged, handleActiveSpeakers);
+            room.on(LivekitClient.RoomEvent.DataReceived, handleIncomingData);
+            room.on(LivekitClient.RoomEvent.Disconnected, () => {
+                tg?.close ? tg.close() : window.close();
+            });
+        }
+
+        function updateParticipantsGrid() {
+            const grid = document.getElementById('participants-grid');
+            grid.innerHTML = "";
+
+            const allParticipants = [room.localParticipant, ...Array.from(room.remoteParticipants.values())];
+
+            allParticipants.forEach(p => {
+                let meta = {};
+                try { meta = JSON.parse(p.metadata || "{}"); } catch(e){}
+
+                const card = document.createElement('div');
+                card.className = "flex flex-col items-center gap-1 cursor-pointer";
+                card.onclick = () => openProfileModal(p, meta);
+
+                const avatarWrapper = document.createElement('div');
+                avatarWrapper.id = `avatar-${p.identity}`;
+                avatarWrapper.className = "relative w-14 h-14 rounded-full border-2 border-slate-700 flex items-center justify-center bg-slate-800 transition duration-200 overflow-hidden";
+
+                if (meta.photo_url) {
+                    avatarWrapper.innerHTML = `<img src="${meta.photo_url}" class="w-full h-full object-cover">`;
+                } else {
+                    avatarWrapper.innerHTML = `<span class="font-bold text-sm text-indigo-300">${(p.name || "U")[0]}</span>`;
+                }
+
+                // Mic muted indicator
+                const isMuted = !p.isSpeaking && p.audioTrackPublications?.size > 0 && Array.from(p.audioTrackPublications.values())[0]?.isMuted;
+                if (isMuted) {
+                    const muteBadge = document.createElement('div');
+                    muteBadge.className = "absolute bottom-0 right-0 p-1 bg-rose-600 rounded-full text-white";
+                    muteBadge.innerHTML = `<i data-lucide="mic-off" class="w-2.5 h-2.5"></i>`;
+                    avatarWrapper.appendChild(muteBadge);
+                }
+
+                const nameTag = document.createElement('span');
+                nameTag.className = "text-[11px] text-slate-300 truncate max-w-[70px]";
+                nameTag.innerText = p.name || "User";
+
+                card.appendChild(avatarWrapper);
+                card.appendChild(nameTag);
+                grid.appendChild(card);
+            });
+            lucide.createIcons();
+        }
+
+        function handleActiveSpeakers(speakers) {
+            document.querySelectorAll('[id^="avatar-"]').forEach(el => el.classList.remove('speaker-active'));
+            speakers.forEach(s => {
+                const el = document.getElementById(`avatar-${s.identity}`);
+                if (el) el.classList.add('speaker-active');
+            });
+        }
+
+        async function toggleMic() {
+            isMicEnabled = !isMicEnabled;
+            await room.localParticipant.setMicrophoneEnabled(isMicEnabled);
+            const btn = document.getElementById('mic-btn');
+            const icon = document.getElementById('mic-icon');
+            if (isMicEnabled) {
+                btn.className = "p-5 bg-indigo-600 text-white rounded-full active:scale-95 transition shadow-lg shadow-indigo-500/30";
+                icon.setAttribute("data-lucide", "mic");
+            } else {
+                btn.className = "p-5 bg-rose-600 text-white rounded-full active:scale-95 transition shadow-lg shadow-rose-500/30";
+                icon.setAttribute("data-lucide", "mic-off");
+            }
+            lucide.createIcons();
+            updateParticipantsGrid();
+        }
+
+        function toggleSpeaker() {
+            isSpeakerEnabled = !isSpeakerEnabled;
+            room.remoteParticipants.forEach(p => {
+                p.audioTrackPublications.forEach(pub => {
+                    if (pub.track) pub.track.setVolume(isSpeakerEnabled ? 1 : 0);
+                });
+            });
+            const icon = document.getElementById('speaker-icon');
+            icon.setAttribute("data-lucide", isSpeakerEnabled ? "volume-2" : "volume-x");
+            lucide.createIcons();
+        }
+
+        function handleLeaveClick() {
+            if (isAdmin) {
+                document.getElementById('admin-leave-modal').classList.remove('hidden');
+            } else {
+                leaveRoom(false);
+            }
+        }
+
+        async function leaveRoom(endForAll) {
+            if (endForAll) {
+                await fetch('/api/end-room', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ chat_id: currentChatId, init_data: tg.initData })
+                });
+            }
+            if (room) await room.disconnect();
+            tg?.close ? tg.close() : window.close();
+        }
+
+        function closeAdminLeaveModal() {
+            document.getElementById('admin-leave-modal').classList.add('hidden');
+        }
+
+        function openProfileModal(participant, meta) {
+            document.getElementById('modal-name').innerText = participant.name || "User";
+            document.getElementById('modal-role').innerText = meta.is_admin ? "Group Admin" : "Member";
+            document.getElementById('modal-username').innerText = meta.username ? `@${meta.username}` : `ID: ${participant.identity}`;
+            document.getElementById('modal-img').src = meta.photo_url || "https://telegram.org/img/t_logo.png";
+
+            const btn = document.getElementById('modal-open-tg');
+            btn.onclick = () => {
+                if (meta.username) tg?.openTelegramLink(`https://t.me/${meta.username}`);
+                else tg?.openTelegramLink(`tg://user?id=${participant.identity}`);
+            };
+
+            document.getElementById('profile-modal').classList.remove('hidden');
+        }
+
+        function closeProfileModal() {
+            document.getElementById('profile-modal').classList.add('hidden');
+        }
+
+        function toggleChatDrawer() {
+            const el = document.getElementById('chat-drawer');
+            el.classList.toggle('hidden');
+            document.getElementById('chat-badge').classList.add('hidden');
+        }
+
+        function sendChatMessage() {
+            const input = document.getElementById('chat-input');
+            const txt = input.value.trim();
+            if (!txt || !room) return;
+
+            const payload = JSON.stringify({ name: room.localParticipant.name, msg: txt });
+            room.localParticipant.publishData(new TextEncoder().encode(payload), { reliable: true });
+
+            appendMsg(room.localParticipant.name, txt, true);
+            input.value = "";
+        }
+
+        function handleIncomingData(payload, participant) {
+            try {
+                const data = JSON.parse(new TextDecoder().decode(payload));
+                appendMsg(data.name, data.msg, false);
+                if (document.getElementById('chat-drawer').classList.contains('hidden')) {
+                    document.getElementById('chat-badge').classList.remove('hidden');
+                }
+            } catch(e){}
+        }
+
+        function appendMsg(name, msg, isMe) {
+            const box = document.getElementById('chat-messages');
+            const div = document.createElement('div');
+            div.className = `p-2 rounded-xl max-w-[80%] ${isMe ? 'ml-auto bg-indigo-600 text-white' : 'bg-slate-800 text-slate-200 border border-slate-700'}`;
+            div.innerHTML = `<span class="font-bold block text-[10px] opacity-75">${name}</span>${msg}`;
+            box.appendChild(div);
+            box.scrollTop = box.scrollHeight;
+        }
+
+        // Start
+        initVoice();
+    </script>
+</body>
+</html>
