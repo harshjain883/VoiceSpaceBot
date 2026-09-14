@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  # Self-hosted LiveKit SFU Server
+  livekit:
+    image: livekit/livekit-server:latest
+    command: --dev
+    restart: always
+    network_mode: "host"
+
+  # Bot + FastAPI Web Server
+  voice-bot:
+    build: .
+    restart: always
+    network_mode: "host"
+    environment:
+      - API_ID=${API_ID}
+      - API_HASH=${API_HASH}
+      - BOT_TOKEN=${BOT_TOKEN}
+      - WEBAPP_URL=${WEBAPP_URL}
+      - LIVEKIT_URL=ws://127.0.0.1:7880
+      - LIVEKIT_API_KEY=devkey
+      - LIVEKIT_API_SECRET=secret
+      
