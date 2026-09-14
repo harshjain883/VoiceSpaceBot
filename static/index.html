@@ -3,7 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <!-- Dynamic Title placeholder -->
     <title id="app-title">Voice Space</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -16,13 +15,16 @@
 </head>
 <body class="h-screen flex flex-col justify-between p-4 select-none overflow-hidden">
 
-    <!-- Top Status Bar with Dynamic Group Name -->
+    <!-- Audio Element for remote voices -->
+    <audio id="remote-audio-container" autoplay playsinline class="hidden"></audio>
+
+    <!-- Top Status Bar -->
     <div class="flex items-center justify-between bg-slate-800/60 backdrop-blur-md p-3 rounded-2xl border border-slate-700/50">
         <div class="flex items-center gap-2 overflow-hidden">
-            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
+            <span id="status-dot" class="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse shrink-0"></span>
             <div class="flex flex-col truncate">
                 <span class="text-sm font-bold text-white truncate" id="display-group-name">Connecting...</span>
-                <span class="text-[10px] text-slate-400 font-medium" id="room-status">Joining Voice Space</span>
+                <span class="text-[10px] text-slate-400 font-medium" id="room-status">Initializing WebApp</span>
             </div>
         </div>
         <button onclick="toggleChatDrawer()" class="p-2 bg-slate-700/50 rounded-xl relative shrink-0">
@@ -34,7 +36,7 @@
     <!-- Participants Grid -->
     <div id="participants-grid" class="flex-1 grid grid-cols-3 sm:grid-cols-4 gap-4 py-6 auto-rows-max overflow-y-auto items-center justify-center"></div>
 
-    <!-- Controls -->
+    <!-- Control Bar -->
     <div class="bg-slate-800/80 backdrop-blur-lg p-4 rounded-3xl border border-slate-700/60 flex items-center justify-around max-w-sm mx-auto w-full mb-2">
         <button onclick="handleLeaveClick()" class="p-4 bg-rose-500/20 text-rose-400 rounded-2xl active:scale-95 transition">
             <i data-lucide="phone-off" class="w-6 h-6"></i>
@@ -69,7 +71,7 @@
         </div>
     </div>
 
-    <!-- Admin Leave Modal -->
+    <!-- Leave Modal -->
     <div id="admin-leave-modal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div class="bg-slate-800 border border-slate-700 w-full max-w-xs rounded-3xl p-6 text-center space-y-4">
             <h3 class="font-bold text-white text-base">Leave Voice Space</h3>
@@ -97,7 +99,10 @@
 
     <script>
         const tg = window.Telegram?.WebApp;
-        if (tg) { tg.ready(); tg.expand(); }
+        if (tg) {
+            tg.ready();
+            tg.expand();
+        }
         lucide.createIcons();
 
         let room = null;
@@ -105,37 +110,66 @@
         let isSpeakerEnabled = true;
         let myIsAdmin = false;
         let myIsOwner = false;
-        let currentChatId = new URLSearchParams(window.location.search).get('chat_id');
+
+        // FIXED: Extract chat_id from start_param (Native Mini App) or URL params
+        let rawParam = tg?.initDataUnsafe?.start_param || new URLSearchParams(window.location.search).get('chat_id') || "";
+        let currentChatId = rawParam.startsWith('-') ? rawParam : (rawParam ? `-${rawParam}` : "");
 
         async function initVoice() {
             if (!currentChatId || !tg?.initData) {
-                document.getElementById('room-status').innerText = "Missing parameters";
+                document.getElementById('display-group-name').innerText = "Telegram Auth Error";
+                document.getElementById('room-status').innerText = "Please open via Telegram Bot button";
+                document.getElementById('status-dot').className = "w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0";
                 return;
             }
+
             try {
+                document.getElementById('room-status').innerText = "Fetching Room Token...";
+
                 const res = await fetch('/api/get-token', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ chat_id: currentChatId, init_data: tg.initData })
                 });
+
+                if (!res.ok) {
+                    const errData = await res.json();
+                    throw new Error(errData.detail || "Authentication Failed");
+                }
+
                 const data = await res.json();
                 myIsAdmin = data.is_admin;
                 myIsOwner = data.is_owner;
 
-                // Dynamically set Group Title everywhere
                 const groupTitle = data.group_title || "Voice Space";
                 document.title = groupTitle;
                 document.getElementById('display-group-name').innerText = groupTitle;
 
-                room = new LivekitClient.Room({ adaptiveStream: true, dynacast: true });
+                // Connect to LiveKit SFU
+                document.getElementById('room-status').innerText = "Joining Media SFU...";
+                room = new LivekitClient.Room({ 
+                    adaptiveStream: true, 
+                    dynacast: true,
+                    audioCaptureDefaults: { autoGainControl: true, echoCancellation: true, noiseSuppression: true }
+                });
+
                 await room.connect(data.livekit_url, data.token);
-                document.getElementById('room-status').innerText = "HD Connected";
+
+                // Update UI state
+                document.getElementById('room-status').innerText = "HD Live Connected";
+                const dot = document.getElementById('status-dot');
+                dot.className = "w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0";
+
+                // Publish Mic Track
                 await room.localParticipant.setMicrophoneEnabled(true);
 
                 setupRoomEvents();
                 updateParticipantsGrid();
             } catch (err) {
-                document.getElementById('room-status').innerText = "Connection Failed";
+                console.error("LiveKit connection error:", err);
+                document.getElementById('display-group-name').innerText = "Connection Failed";
+                document.getElementById('room-status').innerText = err.message || "Failed to establish voice";
+                document.getElementById('status-dot').className = "w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0";
             }
         }
 
@@ -144,15 +178,24 @@
             room.on(LivekitClient.RoomEvent.ParticipantDisconnected, updateParticipantsGrid);
             room.on(LivekitClient.RoomEvent.ActiveSpeakersChanged, handleActiveSpeakers);
             room.on(LivekitClient.RoomEvent.DataReceived, handleIncomingData);
+            room.on(LivekitClient.RoomEvent.TrackSubscribed, (track) => {
+                if (track.kind === LivekitClient.Track.Kind.Audio) {
+                    const audioEl = track.attach();
+                    document.body.appendChild(audioEl);
+                }
+            });
             room.on(LivekitClient.RoomEvent.Disconnected, () => {
                 tg?.close ? tg.close() : window.close();
             });
         }
 
         function updateParticipantsGrid() {
+            if (!room) return;
             const grid = document.getElementById('participants-grid');
             grid.innerHTML = "";
-            [room.localParticipant, ...Array.from(room.remoteParticipants.values())].forEach(p => {
+            const allParticipants = [room.localParticipant, ...Array.from(room.remoteParticipants.values())];
+
+            allParticipants.forEach(p => {
                 let meta = {};
                 try { meta = JSON.parse(p.metadata || "{}"); } catch(e){}
 
@@ -192,6 +235,7 @@
         }
 
         async function toggleMic() {
+            if (!room) return;
             isMicEnabled = !isMicEnabled;
             await room.localParticipant.setMicrophoneEnabled(isMicEnabled);
             const btn = document.getElementById('mic-btn');
@@ -201,26 +245,42 @@
         }
 
         function toggleSpeaker() {
+            if (!room) return;
             isSpeakerEnabled = !isSpeakerEnabled;
-            room.remoteParticipants.forEach(p => { p.audioTrackPublications.forEach(pub => { if (pub.track) pub.track.setVolume(isSpeakerEnabled ? 1 : 0); }); });
+            room.remoteParticipants.forEach(p => { 
+                p.audioTrackPublications.forEach(pub => { 
+                    if (pub.track) pub.track.setVolume(isSpeakerEnabled ? 1 : 0); 
+                }); 
+            });
             document.getElementById('speaker-icon').setAttribute("data-lucide", isSpeakerEnabled ? "volume-2" : "volume-x");
             lucide.createIcons();
         }
 
         function handleLeaveClick() {
-            if (myIsAdmin || myIsOwner) document.getElementById('admin-leave-modal').classList.remove('hidden');
-            else leaveRoom(false);
+            if (myIsAdmin || myIsOwner) {
+                document.getElementById('admin-leave-modal').classList.remove('hidden');
+            } else {
+                leaveRoom(false);
+            }
         }
 
         async function leaveRoom(endForAll) {
-            if (endForAll) {
-                await fetch('/api/end-room', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ chat_id: currentChatId, init_data: tg.initData }) });
+            if (endForAll && currentChatId) {
+                await fetch('/api/end-room', { 
+                    method: 'POST', 
+                    headers: {'Content-Type': 'application/json'}, 
+                    body: JSON.stringify({ chat_id: currentChatId, init_data: tg.initData }) 
+                });
             }
-            if (room) await room.disconnect();
+            if (room) {
+                await room.disconnect();
+            }
             tg?.close ? tg.close() : window.close();
         }
 
-        function closeAdminLeaveModal() { document.getElementById('admin-leave-modal').classList.add('hidden'); }
+        function closeAdminLeaveModal() { 
+            document.getElementById('admin-leave-modal').classList.add('hidden'); 
+        }
 
         function openProfileModal(participant, meta) {
             document.getElementById('modal-name').innerText = participant.name || "User";
@@ -241,7 +301,7 @@
             document.getElementById('modal-img').src = meta.photo_url || "https://telegram.org/img/t_logo.png";
 
             const actionsBox = document.getElementById('admin-actions-box');
-            const isTargetSelf = participant.identity === room.localParticipant.identity;
+            const isTargetSelf = participant.identity === room?.localParticipant?.identity;
 
             const canModerate = myIsOwner || (myIsAdmin && !meta.is_owner && !meta.is_admin);
 
@@ -291,7 +351,9 @@
             try {
                 const data = JSON.parse(new TextDecoder().decode(payload));
                 appendMsg(data.name, data.msg, false);
-                if (document.getElementById('chat-drawer').classList.contains('hidden')) document.getElementById('chat-badge').classList.remove('hidden');
+                if (document.getElementById('chat-drawer').classList.contains('hidden')) {
+                    document.getElementById('chat-badge').classList.remove('hidden');
+                }
             } catch(e){}
         }
 
@@ -304,6 +366,7 @@
             box.scrollTop = box.scrollHeight;
         }
 
+        // Initialize Voice Chat
         initVoice();
     </script>
 </body>
