@@ -15,6 +15,7 @@ API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 BOT_USERNAME = os.getenv("BOT_USERNAME", "").replace("@", "").strip()
+APP_SHORT_NAME = os.getenv("APP_SHORT_NAME", "app").strip()
 WEBAPP_URL = os.getenv("WEBAPP_URL").rstrip("/")
 
 raw_owners = os.getenv("OWNER_ID", "")
@@ -37,7 +38,7 @@ async def start_vc_command(client: Client, message: types.Message):
     chat = message.chat
     caller_id = message.from_user.id
 
-    # 1. Verify Bot's Admin Rights and "can_invite_users" Privilege
+    # 1. Admin & Permission Check
     bot_member = await chat.get_member("me")
     if bot_member.status != ChatMemberStatus.ADMINISTRATOR:
         return await message.reply_text(
@@ -50,10 +51,10 @@ async def start_vc_command(client: Client, message: types.Message):
         return await message.reply_text(
             "⚠️ **Permission Missing!**\n\n"
             "Bot ko kaam karne ke liye **Invite Users via Link** permission chahiye.\n"
-            "Admin Settings mein jaakar yeh permission enable karein!"
+            "Admin Settings mein jaakar permission enable karein!"
         )
 
-    # 2. Verify Caller is Admin or Owner
+    # 2. Caller Admin Check
     caller_member = await chat.get_member(caller_id)
     is_owner = caller_id in OWNER_IDS
     is_admin = caller_member.status in [ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER]
@@ -83,20 +84,20 @@ async def start_vc_command(client: Client, message: types.Message):
         invite_link=invite_link
     )
 
-    twa_url = f"{WEBAPP_URL}?chat_id={chat.id}"
+    # NATIVE TELEGRAM MINI APP DIRECT LAUNCH LINK
+    # Format: https://t.me/<BOT_USERNAME>/<SHORT_NAME>?startapp=<CHAT_ID>
+    twa_native_url = f"https://t.me/{BOT_USERNAME}/{APP_SHORT_NAME}?startapp={abs(chat.id)}"
 
-    # FIXED: Telegram groups reject InlineKeyboardButton(web_app=...).
-    # Using direct URL button to open in Telegram WebView.
     markup = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🎙 Join Voice Space", url=twa_url)]
+        [InlineKeyboardButton("🎙 Join Voice Space", url=twa_native_url)]
     ])
 
     await message.reply_text(
         f"🎧 **Voice Space Started for {chat.title}**\n\n"
         f"🛡 **Invite Permission:** Verified ✅\n"
-        f"👑 **Admins:** Synced with Database\n"
+        f"👑 **Admins:** Synced\n"
         f"🔊 **Quality:** HD Opus Audio (Lag-Free)\n\n"
-        f"Click below to join the voice space:",
+        f"Click below to join directly inside Telegram:",
         reply_markup=markup
     )
 
@@ -126,18 +127,17 @@ async def owner_active_vc_panel(client: Client, message: types.Message):
 
             group_title = data.get("title", f"Chat {chat_id}")
             tg_invite = data.get("invite_link", "Unavailable")
-            twa_url = f"{WEBAPP_URL}?chat_id={chat_id}"
+            twa_native_url = f"https://t.me/{BOT_USERNAME}/{APP_SHORT_NAME}?startapp={abs(int(chat_id))}"
 
             text += f"📌 **Group:** `{group_title}`\n"
             text += f"🆔 **Chat ID:** `{chat_id}`\n"
             text += f"👥 **Online Members:** `{member_count}`\n"
             text += f"🔗 **Group Invite Link:** {tg_invite}\n"
-            text += f"🚀 **Mini App Link:** `{twa_url}`\n"
+            text += f"🚀 **Mini App Link:** `{twa_native_url}`\n"
             text += "────────────────────────\n"
 
-            # FIXED: Both buttons use standard URL attributes
             keyboard.append([
-                InlineKeyboardButton(f"🎙 Join VC ({group_title[:12]})", url=twa_url),
+                InlineKeyboardButton(f"🎙 Join VC ({group_title[:12]})", url=twa_native_url),
                 InlineKeyboardButton("🔗 Group Link", url=tg_invite if tg_invite.startswith("http") else "https://t.me")
             ])
 
