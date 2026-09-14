@@ -7,14 +7,14 @@ from pyrogram.errors import RPCError
 from dotenv import load_dotenv
 from livekit import api
 
-from db import set_room, get_all_rooms, get_room
+from db import set_room, get_all_rooms
 
 load_dotenv()
 
 API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-BOT_USERNAME = os.getenv("BOT_USERNAME", "").replace("@", "").strip()
+BOT_USERNAME = os.getenv("BOT_USERNAME", "Gcvoicechatbot").replace("@", "").strip()
 APP_SHORT_NAME = os.getenv("APP_SHORT_NAME", "myapp").strip()
 WEBAPP_URL = os.getenv("WEBAPP_URL", "").rstrip("/")
 
@@ -32,82 +32,57 @@ bot = Client(
     bot_token=BOT_TOKEN
 )
 
-# 1. /start HANDLER (For Private DMs & Startapp Redirects)
 @bot.on_message(filters.command("start") & filters.private)
 async def start_private_handler(client: Client, message: types.Message):
     args = message.command
-    
-    # Agar user startapp link se aaya hai (e.g. /start room_123456)
     if len(args) > 1:
-        raw_target = args[1]
-        chat_id = raw_target.replace("vc_", "").replace("room_", "")
-        if not chat_id.startswith("-"):
-            chat_id = f"-{chat_id}"
-            
+        raw_target = args[1].replace("vc_", "").replace("room_", "")
+        chat_id = raw_target if raw_target.startswith("-") else f"-{raw_target}"
         twa_url = f"{WEBAPP_URL}?chat_id={chat_id}"
-        markup = InlineKeyboardMarkup([
-            [InlineKeyboardButton("🎙 Open Voice Space", web_app=WebAppInfo(url=twa_url))]
-        ])
         return await message.reply_text(
-            "🚀 **Voice Space Ready!**\n\nNeeche button par click karke Voice Space join karein:",
-            reply_markup=markup
+            "🚀 **Voice Space Ready!**\n\nNeeche button par tap karke join karein:",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🎙 Join Voice Space", web_app=WebAppInfo(url=twa_url))]
+            ])
         )
 
-    # Normal /start in DM
-    help_text = (
+    await message.reply_text(
         f"👋 **Namaste {message.from_user.first_name}!**\n\n"
-        "Main Telegram Voice Space Bot hoon.\n\n"
-        "📌 **Kaise use karein?**\n"
-        "1. Mujhe apne group mein **Admin** banayein (Invite Users permission ke sath).\n"
-        "2. Group mein `/vc` command send karein.\n"
-        "3. Mini App launch ho jayega HD Voice call ke sath!"
+        "Mujhe kisi bhi group mein add karke Admin banayein aur `/vc` command dein!"
     )
-    await message.reply_text(help_text)
 
-
-# 2. /vc COMMAND (For Groups)
 @bot.on_message(filters.command("vc") & filters.group)
 async def start_vc_command(client: Client, message: types.Message):
     chat = message.chat
     caller_id = message.from_user.id
 
-    # Admin check
+    # 1. Admin Verification
     bot_member = await chat.get_member("me")
     if bot_member.status != ChatMemberStatus.ADMINISTRATOR:
-        return await message.reply_text(
-            "❌ **Bot Admin nahi hai!**\n\n"
-            "Kripya mujhe group ka Administrator banayein."
-        )
-
-    privileges = bot_member.privileges
-    if not (privileges and privileges.can_invite_users):
-        return await message.reply_text(
-            "⚠️ **Permission Missing!**\n\n"
-            "Bot ko **Invite Users via Link** permission chahiye."
-        )
+        return await message.reply_text("❌ Mujhe group ka Admin banayein taaki Voice Space chal sake.")
 
     caller_member = await chat.get_member(caller_id)
     is_owner = caller_id in OWNER_IDS
     is_admin = caller_member.status in [ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER]
 
     if not is_owner and not is_admin:
-        return await message.reply_text("❌ Sirf group admins Voice Space start kar sakte hain.")
+        return await message.reply_text("❌ Sirf group admins hi Voice Space start kar sakte hain.")
 
-    # Invite Link
+    # 2. Invite Link
     invite_link = chat.invite_link
     if not invite_link:
         try:
             link_obj = await client.create_chat_invite_link(chat.id, name="Voice Space")
             invite_link = link_obj.invite_link
         except RPCError:
-            invite_link = f"https://t.me/{chat.username}" if chat.username else "No link accessible"
+            invite_link = f"https://t.me/{chat.username}" if chat.username else "No link"
 
-    # Sync Admins
+    # 3. Admins List
     admin_ids = []
     async for member in chat.get_members(filter=ChatMembersFilter.ADMINISTRATORS):
         admin_ids.append(member.user.id)
 
-    # Save to DB
+    # 4. Save Room in DB
     await set_room(
         chat_id=str(chat.id),
         title=chat.title,
@@ -115,74 +90,43 @@ async def start_vc_command(client: Client, message: types.Message):
         invite_link=invite_link
     )
 
+    # Telegram Native App Link: Direct popup trigger
     clean_chat_id = str(chat.id).replace("-100", "").replace("-", "")
-    
-    # Direct Mini App Link (Attachment/Webapp Drawer format)
-    direct_app_url = f"https://t.me/{BOT_USERNAME}/{APP_SHORT_NAME}?startapp={clean_chat_id}"
-    dm_fallback_url = f"https://t.me/{BOT_USERNAME}?start=vc_{clean_chat_id}"
+    direct_launch_url = f"https://t.me/{BOT_USERNAME}/{APP_SHORT_NAME}?startapp={clean_chat_id}"
 
+    # ONLY 1 SINGLE BUTTON
     markup = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🎙 Join Voice Space (Mini App)", url=direct_app_url)],
-        [InlineKeyboardButton("💬 Join via Bot DM", url=dm_fallback_url)]
+        [InlineKeyboardButton("🎙 Join Voice Space", url=direct_launch_url)]
     ])
 
     await message.reply_text(
         f"🎧 **Voice Space Started: {chat.title}**\n\n"
         f"👑 **Admins:** Synced\n"
         f"🔊 **Audio Engine:** LiveKit WebRTC (Lag-Free)\n\n"
-        f"Neeche button dabakar join karein:",
+        f"Click below to join:",
         reply_markup=markup
     )
 
-
-# 3. /activevc COMMAND (Owner Only Panel)
 @bot.on_message(filters.command("activevc") & filters.user(OWNER_IDS) & filters.private)
 async def owner_active_vc_panel(client: Client, message: types.Message):
     active_rooms = await get_all_rooms()
     if not active_rooms:
         return await message.reply_text("📭 Abhi koi bhi Voice Space active nahi hai.")
 
-    lk_api = api.LiveKitAPI(LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET)
-    try:
-        text = "🎛 **Active Voice Spaces Panel**\n\n"
-        keyboard = []
+    text = "🎛 **Active Voice Spaces Panel**\n\n"
+    keyboard = []
+    for data in active_rooms:
+        chat_id = data.get("chat_id")
+        group_title = data.get("title", f"Chat {chat_id}")
+        clean_id = str(chat_id).replace("-100", "").replace("-", "")
+        app_url = f"https://t.me/{BOT_USERNAME}/{APP_SHORT_NAME}?startapp={clean_id}"
 
-        for data in active_rooms:
-            chat_id = data.get("chat_id")
-            room_name = f"room_{chat_id}"
-            member_count = 0
-            try:
-                participants = await lk_api.room.list_participants(
-                    api.ListParticipantsRequest(room=room_name)
-                )
-                member_count = len(participants)
-            except Exception:
-                pass
+        text += f"📌 **Group:** `{group_title}`\n🆔 `{chat_id}`\n───────────────────\n"
+        keyboard.append([InlineKeyboardButton(f"🎙 Join VC ({group_title[:12]})", url=app_url)])
 
-            group_title = data.get("title", f"Chat {chat_id}")
-            clean_id = str(chat_id).replace("-100", "").replace("-", "")
-            twa_url = f"{WEBAPP_URL}?chat_id={chat_id}"
-
-            text += f"📌 **Group:** `{group_title}`\n"
-            text += f"🆔 **Chat ID:** `{chat_id}`\n"
-            text += f"👥 **Members:** `{member_count}`\n"
-            text += "────────────────────────\n"
-
-            keyboard.append([
-                InlineKeyboardButton(f"🎙 Join VC ({group_title[:10]})", web_app=WebAppInfo(url=twa_url))
-            ])
-
-        await message.reply_text(
-            text,
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
-    finally:
-        await lk_api.aclose()
-
+    await message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
 
 if __name__ == "__main__":
-    print("---------------------------------------")
-    print(">>> Voice Space Pyrogram Bot Started! <<<")
-    print("---------------------------------------")
+    print("Voice Space Pyrogram Bot is Running...")
     bot.run()
     
