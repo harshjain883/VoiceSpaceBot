@@ -234,4 +234,92 @@ async def moderate_user(req: ModerateRequest):
         await lk_api.aclose()
 
     return {"status": "ok"}
+
+@app.post("/api/get-token")
+async def get_token(req: TokenRequest):
+    # 1. Telegram WebApp Data Validation
+    is_valid, user_data = verify_telegram_init_data(req.init_data, BOT_TOKEN)
+    if not is_valid or not user_data:
+        raise HTTPException(status_code=401, detail="Invalid Telegram authentication data")
+
+    user_id = user_data.get("id")
+    first_name = user_data.get("first_name", "User")
+    username = user_data.get("username", "")
+    photo_url = user_data.get("photo_url", "")
+
+    # Parse dynamic param (e.g. 4362672803x7f2a1b)
+    incoming_param = req.chat_id.replace("vc_", "").replace("room_", "")
+    
+    if "x" in incoming_param:
+        raw_chat_part, _ = incoming_param.split("x", 1)
+    else:
+        raw_chat_part = incoming_param
+
+    normalized_chat_id = raw_chat_part if raw_chat_part.startswith("-") else (
+        raw_chat_part if raw_chat_part.startswith("-100") else f"-100{raw_chat_part}"
+    )
+
+    # 2. Fetch Room from DB
+    room_data = await get_room(normalized_chat_id)
+    if not room_data:
+        # Fallback check
+        room_data = await get_room(raw_chat_part)
+
+    if not room_data:
+        raise HTTPException(status_code=404, detail="Voice Space active nahi hai ya khatam ho chuka hai.")
+
+    # 3. Dynamic Session Verification (Block Unknown / Old Links)
+    active_session = room_data.get("active_session")
+    if active_session and incoming_param != active_session:
+        raise HTTPException(status_code=403, detail="Yeh link purana/expired ho chuka hai! Group se naye link par click karein.")
+
+    group_title = room_data.get("title", "Voice Space")
+    admins = room_data.get("admins", [])
+
+    is_owner = user_id in OWNER_IDS
+    is_admin = user_id in admins
+
+    room_name = f"room_{normalized_chat_id}"
+
+    metadata = json.dumps({
+        "username": username,
+        "photo_url": photo_url,
+        "is_owner": is_owner,
+        "is_admin": is_admin
+    })
+
+    try:
+        grants = api.VideoGrants(
+            room_join=True,
+            room=room_name,
+            can_publish=True,
+            can_subscribe=True,
+            can_publish_data=True
+        )
+    except AttributeError:
+        grants = api.VideoGrant(
+            room_join=True,
+            room=room_name,
+            can_publish=True,
+            can_subscribe=True,
+            can_publish_data=True
+        )
+
+    token = (
+        api.AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET)
+        .with_identity(str(user_id))
+        .with_name(first_name)
+        .with_metadata(metadata)
+        .with_grants(grants)
+        .to_jwt()
+    )
+
+    return {
+        "token": token,
+        "livekit_url": LIVEKIT_URL,
+        "group_title": group_title,
+        "is_admin": is_admin,
+        "is_owner": is_owner
+    }
+    
     
