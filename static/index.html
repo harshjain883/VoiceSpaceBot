@@ -15,7 +15,6 @@
             background: radial-gradient(circle at 50% 10%, #1e1b4b 0%, #0f172a 45%, #090d16 100%);
             color: #f8fafc;
         }
-        /* Aesthetic speaking ripple glow */
         .speaking {
             animation: cute-pulse 1.4s infinite ease-in-out;
             border-color: #38bdf8 !important;
@@ -25,7 +24,6 @@
             0%, 100% { transform: scale(1); }
             50% { transform: scale(1.06); }
         }
-        /* Glassmorphism utility */
         .glass-panel {
             background: rgba(30, 41, 59, 0.55);
             backdrop-filter: blur(16px);
@@ -43,7 +41,7 @@
 </head>
 <body class="h-screen flex flex-col justify-between p-4 select-none relative overflow-hidden">
 
-    <!-- Ambient Cute Glow Blobs in Background -->
+    <!-- Ambient Cute Glow Blobs -->
     <div class="absolute -top-24 -left-20 w-64 h-64 bg-violet-600/20 rounded-full blur-3xl pointer-events-none"></div>
     <div class="absolute top-1/2 -right-24 w-72 h-72 bg-pink-500/15 rounded-full blur-3xl pointer-events-none"></div>
     <div class="absolute -bottom-20 left-1/3 w-60 h-60 bg-sky-500/15 rounded-full blur-3xl pointer-events-none"></div>
@@ -56,7 +54,7 @@
                 <span id="status-dot" class="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-amber-400 border-2 border-[#0f172a]"></span>
             </div>
             <div class="flex flex-col truncate">
-                <span class="text-sm font-extrabold text-white truncate tracking-tight flex items-center gap-1.5" id="group-title">
+                <span class="text-sm font-extrabold text-white truncate tracking-tight" id="group-title">
                     Voice Space ✨
                 </span>
                 <span class="text-[10px] font-medium text-indigo-300/80" id="connection-state">Connecting cozy space...</span>
@@ -70,30 +68,28 @@
             </div>
             <!-- Chat Trigger Button -->
             <button onclick="toggleChat()" class="glass-pill p-2 rounded-2xl text-slate-200 hover:text-pink-300 transition-all active:scale-95 relative">
-                <i data-lucide="sparkles" class="w-4 h-4 text-pink-400"></i>
+                <i data-lucide="message-square" class="w-4 h-4 text-pink-400"></i>
                 <span id="chat-badge" class="hidden absolute -top-1 -right-1 w-2.5 h-2.5 bg-pink-500 rounded-full ring-2 ring-indigo-900 animate-bounce"></span>
             </button>
         </div>
     </header>
 
-    <!-- Center Stage: Circular / Grid Floating Member Bubbles -->
+    <!-- Center Stage: Grid Member Bubbles -->
     <main class="flex-1 flex flex-col items-center justify-center py-4 relative z-10 overflow-hidden">
-        <div id="grid" class="w-full h-full max-h-[65vh] grid grid-cols-3 gap-y-6 gap-x-4 auto-rows-max overflow-y-auto px-2 py-4 items-center justify-center">
-            <!-- Bubbles loaded dynamically -->
-        </div>
+        <div id="grid" class="w-full h-full max-h-[65vh] grid grid-cols-3 gap-y-6 gap-x-4 auto-rows-max overflow-y-auto px-2 py-4 items-center justify-center"></div>
     </main>
 
-    <!-- Cute Toast Notification -->
+    <!-- Error/Notice Toast -->
     <div id="error-banner" class="hidden glass-pill bg-rose-500/10 border-rose-500/30 text-rose-300 text-xs px-4 py-2.5 rounded-2xl text-center mb-3 relative z-10 mx-auto max-w-xs shadow-lg"></div>
 
     <!-- Bottom Floating Island Controls -->
     <footer class="glass-panel px-6 py-3.5 rounded-full max-w-xs mx-auto w-full flex items-center justify-between shadow-2xl relative z-10 mb-2 border border-white/10">
         <!-- Leave Button -->
-        <button onclick="leaveSpace()" class="w-11 h-11 rounded-full bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/25 text-rose-400 flex items-center justify-center transition active:scale-90 shadow-sm">
+        <button onclick="leaveSpace()" class="w-11 h-11 rounded-full bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/25 text-rose-400 flex items-center justify-center transition active:scale-90">
             <i data-lucide="phone-off" class="w-4 h-4"></i>
         </button>
 
-        <!-- Cute Center Mic Button -->
+        <!-- Center Mute / Unmute Button -->
         <button id="mic-btn" onclick="toggleMic()" class="w-16 h-16 rounded-full bg-gradient-to-tr from-pink-500 via-purple-500 to-indigo-500 text-white flex items-center justify-center shadow-lg shadow-purple-500/40 transition active:scale-95 border-2 border-white/20">
             <i id="mic-icon" data-lucide="mic" class="w-6 h-6"></i>
         </button>
@@ -104,12 +100,38 @@
         </button>
     </footer>
 
-    <!-- Aesthetic Chat Drawer Modal -->
-    <div id="chat-drawer" class="hidden absolute inset-0 bg-slate-950/85 backdrop-blur-2xl z-50 flex flex-col p-5 transition-all">
+    <!-- Profile & Admin Moderation Modal -->
+    <div id="profile-modal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-800 border border-slate-700 w-full max-w-xs rounded-3xl p-6 text-center space-y-4 shadow-2xl">
+            <img id="modal-img" class="w-20 h-20 rounded-full mx-auto border-2 border-pink-500 object-cover bg-slate-700" src="" alt="">
+            <div>
+                <h3 id="modal-name" class="font-bold text-lg text-white"></h3>
+                <p id="modal-role" class="text-xs font-bold uppercase mt-0.5"></p>
+                <p id="modal-username" class="text-xs text-slate-400 mt-1"></p>
+            </div>
+
+            <div id="admin-actions-box" class="hidden space-y-2 pt-2 border-t border-slate-700/60">
+                <div class="grid grid-cols-2 gap-2">
+                    <button id="btn-mod-mute" class="p-2.5 bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 rounded-xl text-xs font-semibold">Mute User</button>
+                    <button id="btn-mod-kick" class="p-2.5 bg-rose-500/20 text-rose-300 hover:bg-rose-500/30 rounded-xl text-xs font-semibold">Kick User</button>
+                </div>
+            </div>
+
+            <button id="modal-open-tg" class="w-full p-3 bg-gradient-to-r from-pink-500 to-indigo-600 rounded-xl font-semibold text-white text-sm transition">Telegram Profile</button>
+            <button onclick="closeProfileModal()" class="w-full p-1 text-slate-400 text-xs">Close</button>
+        </div>
+    </div>
+
+    <!-- Aesthetic Chat Drawer with Group Name in Header -->
+    <div id="chat-drawer" class="hidden absolute inset-0 bg-slate-950/90 backdrop-blur-2xl z-50 flex flex-col p-5 transition-all">
+        <!-- Chat Header Showing Exact Group Name -->
         <div class="flex items-center justify-between pb-3 border-b border-white/10">
-            <div class="flex items-center gap-2">
-                <span class="text-base">💬</span>
-                <h3 class="font-bold text-sm text-slate-100">Cozy Room Chat</h3>
+            <div class="flex items-center gap-2 overflow-hidden">
+                <span class="text-lg">💬</span>
+                <div class="flex flex-col truncate">
+                    <h3 class="font-bold text-sm text-slate-100 truncate" id="chat-group-name">Group Chat</h3>
+                    <span class="text-[10px] text-pink-400 font-medium">In-Room Realtime Messages</span>
+                </div>
             </div>
             <button onclick="toggleChat()" class="p-1.5 text-slate-400 hover:text-white rounded-xl bg-white/5 active:scale-90 transition">
                 <i data-lucide="x" class="w-4 h-4"></i>
@@ -143,6 +165,9 @@
         let isMuted = false;
         let isSpeakerOn = true;
         let isChatOpen = false;
+        let currentGroupName = "Voice Space";
+        let myIsAdmin = false;
+        let myIsOwner = false;
 
         const urlParams = new URLSearchParams(window.location.search);
         let rawId = tg?.initDataUnsafe?.start_param || urlParams.get('tgWebAppStartParam') || urlParams.get('chat_id') || "";
@@ -186,7 +211,13 @@
                 }
 
                 const data = await res.json();
-                document.getElementById('group-title').innerText = `${data.group_title || "Voice Space"} ✨`;
+                currentGroupName = data.group_title || "Voice Space";
+                myIsAdmin = data.is_admin;
+                myIsOwner = data.is_owner;
+
+                // Group name on Main Screen & Chat Drawer
+                document.getElementById('group-title').innerText = `${currentGroupName} ✨`;
+                document.getElementById('chat-group-name').innerText = currentGroupName;
                 document.getElementById('connection-state').innerText = "Connecting room...";
 
                 room = new LK.Room({
@@ -211,6 +242,8 @@
                 room.on(LK.RoomEvent.ParticipantConnected, renderUsers);
                 room.on(LK.RoomEvent.ParticipantDisconnected, renderUsers);
                 room.on(LK.RoomEvent.ActiveSpeakersChanged, handleSpeakers);
+                room.on(LK.RoomEvent.TrackMuted, renderUsers);
+                room.on(LK.RoomEvent.TrackUnmuted, renderUsers);
                 
                 room.on(LK.RoomEvent.DataReceived, (payload) => {
                     try {
@@ -221,6 +254,8 @@
 
                 await room.connect(data.livekit_url, data.token);
                 await room.localParticipant.setMicrophoneEnabled(true);
+                isMuted = false;
+                updateMicButtonUI();
 
                 document.getElementById('connection-state').innerText = "HD Live Connected 🌸";
                 const dot = document.getElementById('status-dot');
@@ -245,8 +280,18 @@
                 let meta = {};
                 try { meta = JSON.parse(p.metadata || "{}"); } catch(e) {}
 
+                // Determine if participant is muted
+                let userIsMuted = true;
+                p.audioTrackPublications.forEach(pub => {
+                    if (pub.track && !pub.isMuted) userIsMuted = false;
+                });
+                if (p === room.localParticipant) {
+                    userIsMuted = isMuted;
+                }
+
                 const card = document.createElement('div');
-                card.className = "flex flex-col items-center gap-1.5 transition-all duration-300";
+                card.className = "flex flex-col items-center gap-1.5 transition-all duration-300 cursor-pointer";
+                card.onclick = () => openProfileModal(p, meta);
 
                 const bubble = document.createElement('div');
                 bubble.id = `user-${p.identity}`;
@@ -259,12 +304,19 @@
                     bubble.innerHTML = `<span class="font-bold text-base bg-gradient-to-tr from-pink-400 to-indigo-300 bg-clip-text text-transparent">${initials}</span>`;
                 }
 
+                // Crown for owner
                 if (meta.is_owner) {
                     const badge = document.createElement('span');
                     badge.className = "absolute top-0 right-0 text-[10px] bg-amber-400 text-slate-900 rounded-full px-1 shadow-sm";
                     badge.innerText = "👑";
                     bubble.appendChild(badge);
                 }
+
+                // Mute status mini-pill on avatar
+                const muteBadge = document.createElement('span');
+                muteBadge.className = `absolute bottom-0 right-0 p-1 rounded-full text-[9px] ${userIsMuted ? 'bg-rose-500 text-white' : 'bg-emerald-500 text-slate-900'} shadow-sm`;
+                muteBadge.innerHTML = userIsMuted ? `<i data-lucide="mic-off" class="w-2.5 h-2.5"></i>` : `<i data-lucide="mic" class="w-2.5 h-2.5"></i>`;
+                bubble.appendChild(muteBadge);
 
                 const label = document.createElement('span');
                 label.className = "text-[11px] text-slate-300 font-semibold truncate max-w-[75px] tracking-tight text-center";
@@ -285,16 +337,26 @@
             });
         }
 
+        // Mute / Unmute Toggle Logic
         async function toggleMic() {
             if (!room) return;
             isMuted = !isMuted;
             await room.localParticipant.setMicrophoneEnabled(!isMuted);
+            updateMicButtonUI();
+            renderUsers();
+        }
 
+        function updateMicButtonUI() {
             const btn = document.getElementById('mic-btn');
-            btn.className = !isMuted 
-                ? "w-16 h-16 rounded-full bg-gradient-to-tr from-pink-500 via-purple-500 to-indigo-500 text-white flex items-center justify-center shadow-lg shadow-purple-500/40 transition active:scale-95 border-2 border-white/20" 
-                : "w-16 h-16 rounded-full bg-rose-500 text-white flex items-center justify-center shadow-lg shadow-rose-500/40 transition active:scale-95 border-2 border-white/20";
-            document.getElementById('mic-icon').setAttribute("data-lucide", !isMuted ? "mic" : "mic-off");
+            if (isMuted) {
+                // Muted state: Rose/Red with mic-off
+                btn.className = "w-16 h-16 rounded-full bg-rose-600 hover:bg-rose-500 text-white flex items-center justify-center shadow-lg shadow-rose-600/40 transition active:scale-95 border-2 border-white/20";
+                document.getElementById('mic-icon').setAttribute("data-lucide", "mic-off");
+            } else {
+                // Unmuted state: Cute Gradient with mic
+                btn.className = "w-16 h-16 rounded-full bg-gradient-to-tr from-pink-500 via-purple-500 to-indigo-500 text-white flex items-center justify-center shadow-lg shadow-purple-500/40 transition active:scale-95 border-2 border-white/20";
+                document.getElementById('mic-icon').setAttribute("data-lucide", "mic");
+            }
             if (window.lucide) lucide.createIcons();
         }
 
@@ -309,68 +371,4 @@
             const btn = document.getElementById('spk-btn');
             btn.className = isSpeakerOn 
                 ? "w-11 h-11 rounded-full bg-slate-700/40 border border-white/10 text-slate-200 flex items-center justify-center active:scale-90 transition" 
-                : "w-11 h-11 rounded-full bg-slate-800 border border-white/5 text-slate-500 flex items-center justify-center active:scale-90 transition";
-            document.getElementById('spk-icon').setAttribute("data-lucide", isSpeakerOn ? "volume-2" : "volume-x");
-            if (window.lucide) lucide.createIcons();
-        }
-
-        function toggleChat() {
-            isChatOpen = !isChatOpen;
-            const drawer = document.getElementById('chat-drawer');
-            const badge = document.getElementById('chat-badge');
-            
-            if (isChatOpen) {
-                drawer.classList.remove('hidden');
-                badge.classList.add('hidden');
-                document.getElementById('chat-input').focus();
-            } else {
-                drawer.classList.add('hidden');
-            }
-        }
-
-        function handleSendChat(e) {
-            e.preventDefault();
-            const input = document.getElementById('chat-input');
-            const msg = input.value.trim();
-            if (!msg || !room) return;
-
-            const myName = room.localParticipant.name || "Me";
-            const payload = JSON.stringify({ name: myName, text: msg });
-            room.localParticipant.publishData(new TextEncoder().encode(payload), { reliable: true });
-
-            appendChatMessage(myName, msg, true);
-            input.value = "";
-        }
-
-        function appendChatMessage(name, text, isMe) {
-            const box = document.getElementById('chat-box');
-            const div = document.createElement('div');
-            div.className = `p-3 rounded-2xl max-w-[82%] shadow-sm ${isMe ? 'ml-auto bg-gradient-to-tr from-pink-500 to-indigo-600 text-white rounded-br-sm' : 'bg-white/5 text-slate-200 border border-white/10 rounded-bl-sm'}`;
-            div.innerHTML = `<span class="font-bold block text-[10px] ${isMe ? 'text-pink-100' : 'text-indigo-300'} mb-0.5">${name}</span><p class="leading-relaxed break-words">${text}</p>`;
-            box.appendChild(div);
-            box.scrollTop = box.scrollHeight;
-
-            if (!isChatOpen && !isMe) {
-                document.getElementById('chat-badge').classList.remove('hidden');
-            }
-        }
-
-        async function leaveSpace() {
-            if (room) await room.disconnect();
-            if (tg && tg.close) tg.close();
-            else window.close();
-        }
-
-        window.addEventListener('DOMContentLoaded', () => {
-            let attempts = 0;
-            const checkLiveKitReady = setInterval(() => {
-                attempts++;
-                if (getLiveKit() || attempts > 20) {
-                    clearInterval(checkLiveKitReady);
-                    startVoiceSession();
-                }
-            }, 100);
-        });
-    </script>
-</body>
-</html>
+                : "w-11 h-11 rounded-full bg-slate-800 border border-white/5 text-slate-500
