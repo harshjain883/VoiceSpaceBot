@@ -1,13 +1,13 @@
 import os
 import asyncio
 from pyrogram import Client, filters, types
-from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 from pyrogram.enums import ChatMemberStatus, ChatMembersFilter
 from pyrogram.errors import RPCError
 from dotenv import load_dotenv
 from livekit import api
 
-from db import set_room, get_all_rooms
+from db import set_room, get_all_rooms, get_room
 
 load_dotenv()
 
@@ -15,8 +15,8 @@ API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 BOT_USERNAME = os.getenv("BOT_USERNAME", "").replace("@", "").strip()
-APP_SHORT_NAME = os.getenv("APP_SHORT_NAME", "app").strip()
-WEBAPP_URL = os.getenv("WEBAPP_URL").rstrip("/")
+APP_SHORT_NAME = os.getenv("APP_SHORT_NAME", "myapp").strip()
+WEBAPP_URL = os.getenv("WEBAPP_URL", "").rstrip("/")
 
 raw_owners = os.getenv("OWNER_ID", "")
 OWNER_IDS = [int(x.strip()) for x in raw_owners.split(",") if x.strip().isdigit()]
@@ -32,51 +32,82 @@ bot = Client(
     bot_token=BOT_TOKEN
 )
 
+# 1. /start HANDLER (For Private DMs & Startapp Redirects)
+@bot.on_message(filters.command("start") & filters.private)
+async def start_private_handler(client: Client, message: types.Message):
+    args = message.command
+    
+    # Agar user startapp link se aaya hai (e.g. /start room_123456)
+    if len(args) > 1:
+        raw_target = args[1]
+        chat_id = raw_target.replace("vc_", "").replace("room_", "")
+        if not chat_id.startswith("-"):
+            chat_id = f"-{chat_id}"
+            
+        twa_url = f"{WEBAPP_URL}?chat_id={chat_id}"
+        markup = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🎙 Open Voice Space", web_app=WebAppInfo(url=twa_url))]
+        ])
+        return await message.reply_text(
+            "🚀 **Voice Space Ready!**\n\nNeeche button par click karke Voice Space join karein:",
+            reply_markup=markup
+        )
 
+    # Normal /start in DM
+    help_text = (
+        f"👋 **Namaste {message.from_user.first_name}!**\n\n"
+        "Main Telegram Voice Space Bot hoon.\n\n"
+        "📌 **Kaise use karein?**\n"
+        "1. Mujhe apne group mein **Admin** banayein (Invite Users permission ke sath).\n"
+        "2. Group mein `/vc` command send karein.\n"
+        "3. Mini App launch ho jayega HD Voice call ke sath!"
+    )
+    await message.reply_text(help_text)
+
+
+# 2. /vc COMMAND (For Groups)
 @bot.on_message(filters.command("vc") & filters.group)
 async def start_vc_command(client: Client, message: types.Message):
     chat = message.chat
     caller_id = message.from_user.id
 
-    # 1. Admin & Permission Check
+    # Admin check
     bot_member = await chat.get_member("me")
     if bot_member.status != ChatMemberStatus.ADMINISTRATOR:
         return await message.reply_text(
-            "❌ **Bot is not an Admin!**\n\n"
-            "Please promote me to **Administrator** with **Invite Users via Link** permission enabled."
+            "❌ **Bot Admin nahi hai!**\n\n"
+            "Kripya mujhe group ka Administrator banayein."
         )
 
     privileges = bot_member.privileges
     if not (privileges and privileges.can_invite_users):
         return await message.reply_text(
             "⚠️ **Permission Missing!**\n\n"
-            "Bot ko kaam karne ke liye **Invite Users via Link** permission chahiye.\n"
-            "Admin Settings mein jaakar permission enable karein!"
+            "Bot ko **Invite Users via Link** permission chahiye."
         )
 
-    # 2. Caller Admin Check
     caller_member = await chat.get_member(caller_id)
     is_owner = caller_id in OWNER_IDS
     is_admin = caller_member.status in [ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER]
 
     if not is_owner and not is_admin:
-        return await message.reply_text("❌ Sirf group administrators hi Voice Space start kar sakte hain.")
+        return await message.reply_text("❌ Sirf group admins Voice Space start kar sakte hain.")
 
-    # 3. Retrieve or Create Group Invite Link
+    # Invite Link
     invite_link = chat.invite_link
     if not invite_link:
         try:
-            link_obj = await client.create_chat_invite_link(chat.id, name="Voice Space Link")
+            link_obj = await client.create_chat_invite_link(chat.id, name="Voice Space")
             invite_link = link_obj.invite_link
         except RPCError:
             invite_link = f"https://t.me/{chat.username}" if chat.username else "No link accessible"
 
-    # 4. Extract Admins
+    # Sync Admins
     admin_ids = []
     async for member in chat.get_members(filter=ChatMembersFilter.ADMINISTRATORS):
         admin_ids.append(member.user.id)
 
-    # 5. Persist to MongoDB
+    # Save to DB
     await set_room(
         chat_id=str(chat.id),
         title=chat.title,
@@ -84,33 +115,36 @@ async def start_vc_command(client: Client, message: types.Message):
         invite_link=invite_link
     )
 
-    # NATIVE TELEGRAM MINI APP DIRECT LAUNCH LINK
-    # Format: https://t.me/<BOT_USERNAME>/<SHORT_NAME>?startapp=<CHAT_ID>
-    twa_native_url = f"https://t.me/{BOT_USERNAME}/{APP_SHORT_NAME}?startapp={abs(chat.id)}"
+    clean_chat_id = str(chat.id).replace("-100", "").replace("-", "")
+    
+    # Direct Mini App Link (Attachment/Webapp Drawer format)
+    direct_app_url = f"https://t.me/{BOT_USERNAME}/{APP_SHORT_NAME}?startapp={clean_chat_id}"
+    dm_fallback_url = f"https://t.me/{BOT_USERNAME}?start=vc_{clean_chat_id}"
 
     markup = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🎙 Join Voice Space", url=twa_native_url)]
+        [InlineKeyboardButton("🎙 Join Voice Space (Mini App)", url=direct_app_url)],
+        [InlineKeyboardButton("💬 Join via Bot DM", url=dm_fallback_url)]
     ])
 
     await message.reply_text(
-        f"🎧 **Voice Space Started for {chat.title}**\n\n"
-        f"🛡 **Invite Permission:** Verified ✅\n"
+        f"🎧 **Voice Space Started: {chat.title}**\n\n"
         f"👑 **Admins:** Synced\n"
-        f"🔊 **Quality:** HD Opus Audio (Lag-Free)\n\n"
-        f"Click below to join directly inside Telegram:",
+        f"🔊 **Audio Engine:** LiveKit WebRTC (Lag-Free)\n\n"
+        f"Neeche button dabakar join karein:",
         reply_markup=markup
     )
 
 
+# 3. /activevc COMMAND (Owner Only Panel)
 @bot.on_message(filters.command("activevc") & filters.user(OWNER_IDS) & filters.private)
 async def owner_active_vc_panel(client: Client, message: types.Message):
     active_rooms = await get_all_rooms()
     if not active_rooms:
-        return await message.reply_text("📭 Kisi bhi group mein abhi koi Voice Space active nahi hai.")
+        return await message.reply_text("📭 Abhi koi bhi Voice Space active nahi hai.")
 
     lk_api = api.LiveKitAPI(LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET)
     try:
-        text = "🎛 **Owner Super-Panel - Active Voice Spaces**\n\n"
+        text = "🎛 **Active Voice Spaces Panel**\n\n"
         keyboard = []
 
         for data in active_rooms:
@@ -126,25 +160,21 @@ async def owner_active_vc_panel(client: Client, message: types.Message):
                 pass
 
             group_title = data.get("title", f"Chat {chat_id}")
-            tg_invite = data.get("invite_link", "Unavailable")
-            twa_native_url = f"https://t.me/{BOT_USERNAME}/{APP_SHORT_NAME}?startapp={abs(int(chat_id))}"
+            clean_id = str(chat_id).replace("-100", "").replace("-", "")
+            twa_url = f"{WEBAPP_URL}?chat_id={chat_id}"
 
             text += f"📌 **Group:** `{group_title}`\n"
             text += f"🆔 **Chat ID:** `{chat_id}`\n"
-            text += f"👥 **Online Members:** `{member_count}`\n"
-            text += f"🔗 **Group Invite Link:** {tg_invite}\n"
-            text += f"🚀 **Mini App Link:** `{twa_native_url}`\n"
+            text += f"👥 **Members:** `{member_count}`\n"
             text += "────────────────────────\n"
 
             keyboard.append([
-                InlineKeyboardButton(f"🎙 Join VC ({group_title[:12]})", url=twa_native_url),
-                InlineKeyboardButton("🔗 Group Link", url=tg_invite if tg_invite.startswith("http") else "https://t.me")
+                InlineKeyboardButton(f"🎙 Join VC ({group_title[:10]})", web_app=WebAppInfo(url=twa_url))
             ])
 
         await message.reply_text(
             text,
-            reply_markup=InlineKeyboardMarkup(keyboard),
-            disable_web_page_preview=True
+            reply_markup=InlineKeyboardMarkup(keyboard)
         )
     finally:
         await lk_api.aclose()
