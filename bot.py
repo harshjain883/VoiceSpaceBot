@@ -1,7 +1,7 @@
 import os
 import asyncio
 from pyrogram import Client, filters, types
-from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from pyrogram.enums import ChatMemberStatus, ChatMembersFilter
 from pyrogram.errors import RPCError
 from dotenv import load_dotenv
@@ -14,7 +14,7 @@ load_dotenv()
 API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-BOT_USERNAME = os.getenv("BOT_USERNAME", "")
+BOT_USERNAME = os.getenv("BOT_USERNAME", "").replace("@", "").strip()
 WEBAPP_URL = os.getenv("WEBAPP_URL").rstrip("/")
 
 raw_owners = os.getenv("OWNER_ID", "")
@@ -31,7 +31,7 @@ bot = Client(
     bot_token=BOT_TOKEN
 )
 
-# FIXED: filters.group handles both normal groups and supergroups in Pyrogram
+
 @bot.on_message(filters.command("vc") & filters.group)
 async def start_vc_command(client: Client, message: types.Message):
     chat = message.chat
@@ -84,8 +84,11 @@ async def start_vc_command(client: Client, message: types.Message):
     )
 
     twa_url = f"{WEBAPP_URL}?chat_id={chat.id}"
+
+    # FIXED: Telegram groups reject InlineKeyboardButton(web_app=...).
+    # Using direct URL button to open in Telegram WebView.
     markup = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🎙 Join Voice Space", web_app=WebAppInfo(url=twa_url))]
+        [InlineKeyboardButton("🎙 Join Voice Space", url=twa_url)]
     ])
 
     await message.reply_text(
@@ -96,6 +99,7 @@ async def start_vc_command(client: Client, message: types.Message):
         f"Click below to join the voice space:",
         reply_markup=markup
     )
+
 
 @bot.on_message(filters.command("activevc") & filters.user(OWNER_IDS) & filters.private)
 async def owner_active_vc_panel(client: Client, message: types.Message):
@@ -131,8 +135,9 @@ async def owner_active_vc_panel(client: Client, message: types.Message):
             text += f"🚀 **Mini App Link:** `{twa_url}`\n"
             text += "────────────────────────\n"
 
+            # FIXED: Both buttons use standard URL attributes
             keyboard.append([
-                InlineKeyboardButton(f"🎙 Join VC ({group_title[:12]})", web_app=WebAppInfo(url=twa_url)),
+                InlineKeyboardButton(f"🎙 Join VC ({group_title[:12]})", url=twa_url),
                 InlineKeyboardButton("🔗 Group Link", url=tg_invite if tg_invite.startswith("http") else "https://t.me")
             ])
 
@@ -144,9 +149,10 @@ async def owner_active_vc_panel(client: Client, message: types.Message):
     finally:
         await lk_api.aclose()
 
-# bot.py ke last lines ko replace karein:
+
 if __name__ == "__main__":
     print("---------------------------------------")
     print(">>> Voice Space Pyrogram Bot Started! <<<")
     print("---------------------------------------")
     bot.run()
+    
