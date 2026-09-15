@@ -179,13 +179,13 @@
                 <span id="modal-role" class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full inline-block mt-1"></span>
             </div>
 
-            <!-- Volume Slider -->
+            <!-- Volume Slider (Fully Functional) -->
             <div id="modal-volume-box" class="space-y-2 pt-2 border-t border-white/10 text-left">
                 <div class="flex justify-between items-center text-xs">
-                    <span class="text-slate-400">Volume</span>
-                    <span id="volume-val-display" class="font-bold">100%</span>
+                    <span class="text-slate-400">User Volume</span>
+                    <span id="volume-val-display" class="font-bold text-sky-400">100%</span>
                 </div>
-                <input id="user-volume-slider" type="range" min="0" max="200" value="100" class="w-full h-1.5 bg-slate-700 rounded-lg">
+                <input id="user-volume-slider" type="range" min="0" max="100" value="100" class="w-full h-1.5 bg-slate-700 rounded-lg accent-sky-500 cursor-pointer">
             </div>
 
             <!-- Moderation Controls -->
@@ -234,6 +234,7 @@
         let amIGroupAdmin = false;
         let amIHardLocked = false;
         let participantStates = {};
+        let userVolumes = {}; // Stores custom user volumes: { identity: volumeValue }
 
         let bluetoothDeviceId = null;
         let currentSinkId = "default";
@@ -320,6 +321,11 @@
                     if (track.kind === LK.Track.Kind.Audio) {
                         const audioEl = track.attach();
                         audioEl.id = `audio-${p.identity}`;
+                        
+                        // Apply previously saved volume if exists
+                        const savedVol = userVolumes[p.identity] !== undefined ? userVolumes[p.identity] : 100;
+                        audioEl.volume = savedVol / 100;
+
                         document.getElementById('remote-audio-container').appendChild(audioEl);
                         if (currentSinkId && audioEl.setSinkId) audioEl.setSinkId(currentSinkId).catch(() => {});
                         audioEl.play().catch(() => {});
@@ -530,6 +536,32 @@
             const roleEl = document.getElementById('modal-role');
             roleEl.innerText = meta.is_owner ? "Bot Owner" : (meta.is_admin ? "Group Admin" : "Member");
             roleEl.className = `text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full inline-block mt-1 ${meta.is_owner ? 'bg-amber-400/20 text-amber-500 dark:text-amber-400' : (meta.is_admin ? 'bg-sky-400/20 text-sky-500 dark:text-sky-400' : 'bg-slate-500/20 text-slate-600 dark:text-slate-400')}`;
+
+            // Volume Control Attachment
+            const volumeBox = document.getElementById('modal-volume-box');
+            const volumeSlider = document.getElementById('user-volume-slider');
+            const volumeDisplay = document.getElementById('volume-val-display');
+
+            if (isSelf) {
+                volumeBox.classList.add('hidden');
+            } else {
+                volumeBox.classList.remove('hidden');
+                const currentVol = userVolumes[p.identity] !== undefined ? userVolumes[p.identity] : 100;
+                volumeSlider.value = currentVol;
+                volumeDisplay.innerText = `${currentVol}%`;
+
+                // Live volume adjustment handler
+                volumeSlider.oninput = (e) => {
+                    const newVol = parseInt(e.target.value, 10);
+                    volumeDisplay.innerText = `${newVol}%`;
+                    userVolumes[p.identity] = newVol;
+
+                    const audioEl = document.getElementById(`audio-${p.identity}`);
+                    if (audioEl) {
+                        audioEl.volume = Math.max(0, Math.min(1, newVol / 100));
+                    }
+                };
+            }
 
             const actionsBox = document.getElementById('modal-actions');
             const ownerOpt = document.getElementById('owner-opt-allow-admin');
