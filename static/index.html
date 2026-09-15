@@ -7,21 +7,17 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
-        tailwind.config = {
-            darkMode: 'class'
-        }
+        tailwind.config = { darkMode: 'class' };
     </script>
     <script src="https://cdn.jsdelivr.net/npm/livekit-client@2.5.9/dist/livekit-client.umd.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        * { font-family: 'Plus Jakarta Sans', -apple-system, sans-serif; transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease; }
+        * { font-family: 'Plus Jakarta Sans', -apple-system, sans-serif; transition: background-color 0.2s ease, color 0.2s ease; }
         
-        /* Dark Theme Background */
         html.dark body {
             background: radial-gradient(circle at 50% 8%, #1e1b4b 0%, #0b0f19 50%, #05070d 100%);
             color: #f8fafc;
         }
-        /* Light Theme Background */
         html.light body {
             background: radial-gradient(circle at 50% 8%, #e0e7ff 0%, #f1f5f9 50%, #e2e8f0 100%);
             color: #0f172a;
@@ -29,23 +25,17 @@
 
         .speaking {
             border-color: #38bdf8 !important;
-            box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.4), 0 0 22px rgba(56, 189, 248, 0.5) !important;
-            animation: pulse-ring 1.5s infinite ease-in-out;
-        }
-        @keyframes pulse-ring {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.04); }
+            box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.4), 0 0 20px rgba(56, 189, 248, 0.5) !important;
         }
 
-        /* Glassmorphism Dynamic */
         html.dark .glass-panel {
-            background: rgba(22, 30, 49, 0.65);
+            background: rgba(22, 30, 49, 0.7);
             backdrop-filter: blur(16px);
             -webkit-backdrop-filter: blur(16px);
             border: 1px solid rgba(255, 255, 255, 0.08);
         }
         html.light .glass-panel {
-            background: rgba(255, 255, 255, 0.75);
+            background: rgba(255, 255, 255, 0.8);
             backdrop-filter: blur(16px);
             -webkit-backdrop-filter: blur(16px);
             border: 1px solid rgba(0, 0, 0, 0.08);
@@ -53,12 +43,10 @@
 
         html.dark .glass-pill {
             background: rgba(255, 255, 255, 0.06);
-            backdrop-filter: blur(12px);
             border: 1px solid rgba(255, 255, 255, 0.08);
         }
         html.light .glass-pill {
             background: rgba(0, 0, 0, 0.04);
-            backdrop-filter: blur(12px);
             border: 1px solid rgba(0, 0, 0, 0.06);
         }
 
@@ -66,51 +54,36 @@
             animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
         @keyframes slideUp {
-            from { opacity: 0; transform: translateY(12px) scale(0.96); }
-            to { opacity: 1; transform: translateY(0) scale(1); }
-        }
-        .chat-bubble-exit {
-            animation: fadeOut 0.4s ease-out forwards;
-        }
-        @keyframes fadeOut {
-            from { opacity: 1; transform: scale(1); }
-            to { opacity: 0; transform: scale(0.92); height: 0; margin: 0; padding: 0; }
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
     </style>
 </head>
 <body class="h-screen flex flex-col justify-between p-4 select-none relative overflow-hidden">
 
-    <!-- Ambient Subtle Glows -->
+    <!-- Ambient Glow -->
     <div class="absolute -top-24 -left-20 w-64 h-64 bg-indigo-500/15 rounded-full blur-3xl pointer-events-none"></div>
-    <div class="absolute top-1/2 -right-24 w-72 h-72 bg-pink-500/10 rounded-full blur-3xl pointer-events-none"></div>
 
-    <!-- Top Status Header with Dark/Light Toggle -->
+    <!-- Top Status Header -->
     <header class="glass-panel p-3.5 rounded-2xl flex items-center justify-between shadow-xl relative z-10">
         <div class="flex items-center gap-3 overflow-hidden">
             <span id="status-dot" class="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0 animate-pulse"></span>
             <div class="flex flex-col truncate">
-                <span class="text-sm font-bold truncate dark:text-white text-slate-900" id="group-title">Connecting...</span>
-                <span class="text-[10px] dark:text-slate-400 text-slate-500" id="connection-state">Connecting to space...</span>
+                <span class="text-sm font-bold truncate dark:text-white text-slate-900" id="group-title">Voice Space</span>
+                <span class="text-[10px] dark:text-slate-400 text-slate-500" id="connection-state">Starting Engine...</span>
             </div>
         </div>
         
         <div class="flex items-center gap-2">
-            <!-- Online Counter -->
             <div class="glass-pill px-3 py-1.5 rounded-xl text-xs font-semibold dark:text-slate-300 text-slate-700 flex items-center gap-1.5">
                 <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
                 <span id="participant-count">0</span> Online
             </div>
 
-            <!-- Dark / Light Mode Toggle Button -->
-            <button onclick="toggleTheme()" class="glass-pill p-2 rounded-xl dark:text-amber-300 text-slate-700 hover:scale-105 active:scale-95 transition" title="Toggle Theme">
-                <!-- Sun Icon (Shown in Dark Mode) -->
-                <svg id="theme-icon-sun" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-                </svg>
-                <!-- Moon Icon (Shown in Light Mode) -->
-                <svg id="theme-icon-moon" class="w-4 h-4 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-                </svg>
+            <!-- Theme Toggle -->
+            <button onclick="toggleTheme()" class="glass-pill p-2 rounded-xl dark:text-amber-300 text-slate-700 active:scale-90 transition">
+                <svg id="theme-icon-sun" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                <svg id="theme-icon-moon" class="w-4 h-4 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
             </button>
         </div>
     </header>
@@ -127,8 +100,8 @@
     <div id="chat-input-bar" class="hidden absolute bottom-24 left-4 right-4 z-30 pointer-events-auto">
         <form onsubmit="handleSendChat(event)" class="glass-panel p-2 rounded-2xl flex gap-2 shadow-2xl">
             <input id="chat-input" type="text" placeholder="Type a message into voice chat..." autocomplete="off" class="flex-1 px-4 py-2.5 rounded-xl dark:bg-slate-900/80 bg-white/90 border dark:border-white/10 border-slate-300 dark:text-white text-slate-900 text-xs outline-none focus:border-indigo-500 transition">
-            <button type="submit" class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold transition active:scale-95">Send</button>
-            <button type="button" onclick="toggleChatInput()" class="p-2 dark:text-slate-400 text-slate-600 hover:opacity-80 rounded-xl">
+            <button type="submit" class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold active:scale-95 transition">Send</button>
+            <button type="button" onclick="toggleChatInput()" class="p-2 dark:text-slate-400 text-slate-600 rounded-xl">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
         </form>
@@ -138,54 +111,41 @@
     <div id="error-banner" class="hidden glass-pill bg-rose-500/20 border-rose-500/40 text-rose-500 dark:text-rose-300 text-xs px-4 py-2 rounded-xl text-center mb-2 relative z-10 mx-auto max-w-xs shadow-lg"></div>
 
     <!-- Bottom Dock Controls (Leave | Mic | Chat | Speaker) -->
-    <footer class="glass-panel px-5 py-3 rounded-full max-w-sm mx-auto w-full flex items-center justify-between shadow-2xl relative z-10 mb-2">
-        <!-- 1. Leave Button -->
+    <footer class="glass-panel px-5 py-3 rounded-full max-w-sm mx-auto w-full flex items-center justify-between shadow-2xl relative z-10 mb-2 border border-white/10">
+        <!-- 1. Leave -->
         <button onclick="leaveSpace()" class="w-11 h-11 rounded-full bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/25 text-rose-500 flex items-center justify-center active:scale-90 transition">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 8l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M5 3a2 2 0 00-2 2v1c0 8.284 6.716 15 15 15h1a2 2 0 002-2v-3.28a1 1 0 00-.684-.948l-4.493-1.498a1 1 0 00-1.21.502l-1.13 2.257a11.042 11.042 0 01-5.516-5.517l2.257-1.128a1 1 0 00.502-1.21L9.228 3.683A1 1 0 008.279 3H5z"/></svg>
         </button>
 
-        <!-- 2. Center Mic Button -->
+        <!-- 2. Mic (Fully Centered & Responsive) -->
         <button id="mic-btn" onclick="toggleMic()" class="w-14 h-14 rounded-full bg-rose-600 text-white flex items-center justify-center shadow-lg active:scale-95 transition border-2 border-white/20">
             <svg id="mic-icon" class="w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 02-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/>
+                <line x1="2" y1="2" x2="22" y2="22" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
             </svg>
         </button>
 
-        <!-- 3. Message Button Next to Mic -->
-        <button id="chat-btn" onclick="toggleChatInput()" class="w-11 h-11 rounded-full dark:bg-indigo-600/30 bg-indigo-500/15 hover:bg-indigo-600/40 border border-indigo-400/30 text-indigo-500 dark:text-indigo-300 flex items-center justify-center active:scale-90 transition">
-            <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
-            </svg>
+        <!-- 3. Message Button Next To Mic -->
+        <button id="chat-btn" onclick="toggleChatInput()" class="w-11 h-11 rounded-full dark:bg-indigo-600/30 bg-indigo-500/15 border border-indigo-400/30 text-indigo-500 dark:text-indigo-300 flex items-center justify-center active:scale-90 transition">
+            <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
         </button>
 
-        <!-- 4. Speaker Button -->
-        <button id="spk-btn" onclick="toggleSpeaker()" class="w-11 h-11 rounded-full dark:bg-slate-700/40 bg-slate-200 hover:opacity-80 border dark:border-white/10 border-slate-300 dark:text-slate-200 text-slate-700 flex items-center justify-center active:scale-90 transition">
-            <svg id="spk-icon" class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/>
-            </svg>
+        <!-- 4. Speaker -->
+        <button id="spk-btn" onclick="toggleSpeaker()" class="w-11 h-11 rounded-full dark:bg-slate-700/40 bg-slate-200 border dark:border-white/10 border-slate-300 dark:text-slate-200 text-slate-700 flex items-center justify-center active:scale-90 transition">
+            <svg id="spk-icon" class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/></svg>
         </button>
     </footer>
 
     <script>
         const tg = window.Telegram?.WebApp;
         if (tg) {
-            tg.ready();
-            tg.expand();
+            try {
+                tg.ready();
+                tg.expand();
+            } catch(e) {}
         }
 
-        // Theme Toggle Manager
-        function initTheme() {
-            const savedTheme = localStorage.getItem('app-theme') || (tg?.colorScheme || 'dark');
-            setTheme(savedTheme);
-        }
-
-        function toggleTheme() {
-            const html = document.getElementById('html-root');
-            const newTheme = html.classList.contains('dark') ? 'light' : 'dark';
-            setTheme(newTheme);
-            localStorage.setItem('app-theme', newTheme);
-        }
-
+        // Safe Theme Manager
         function setTheme(theme) {
             const html = document.getElementById('html-root');
             const sunIcon = document.getElementById('theme-icon-sun');
@@ -194,33 +154,35 @@
             if (theme === 'light') {
                 html.classList.remove('dark');
                 html.classList.add('light');
-                sunIcon.classList.add('hidden');
-                moonIcon.classList.remove('hidden');
+                if (sunIcon) sunIcon.classList.add('hidden');
+                if (moonIcon) moonIcon.classList.remove('hidden');
             } else {
                 html.classList.remove('light');
                 html.classList.add('dark');
-                sunIcon.classList.remove('hidden');
-                moonIcon.classList.add('hidden');
+                if (sunIcon) sunIcon.classList.remove('hidden');
+                if (moonIcon) moonIcon.classList.add('hidden');
             }
         }
 
-        initTheme();
+        function toggleTheme() {
+            const html = document.getElementById('html-root');
+            const current = html.classList.contains('dark') ? 'light' : 'dark';
+            setTheme(current);
+            try { localStorage.setItem('theme_pref', current); } catch(e) {}
+        }
 
         let room = null;
         let isMuted = true;
         let isSpeakerOn = true;
 
-        const MAX_FLOATING_MESSAGES = 10;
-        const MESSAGE_LIFETIME_MS = 45000;
-
-        const urlParams = new URLSearchParams(window.location.search);
-        let rawId = tg?.initDataUnsafe?.start_param || urlParams.get('tgWebAppStartParam') || urlParams.get('chat_id') || "";
+        const MAX_MESSAGES = 10;
+        const MESSAGE_LIFETIME = 45000;
 
         function showError(msg) {
             const el = document.getElementById('error-banner');
             el.innerText = msg;
             el.classList.remove('hidden');
-            document.getElementById('connection-state').innerText = "Notice";
+            document.getElementById('connection-state').innerText = "Failed";
             document.getElementById('status-dot').className = "w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0";
         }
 
@@ -229,16 +191,21 @@
         }
 
         async function startVoiceSession() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const rawId = tg?.initDataUnsafe?.start_param || urlParams.get('tgWebAppStartParam') || urlParams.get('chat_id') || "";
+
             if (!rawId) {
-                return showError("Session parameter missing. Please launch via group link.");
+                return showError("Session parameter missing. Launch via group link.");
             }
 
             const LK = getLiveKit();
-            if (!LK) return showError("Audio library loading. Please reopen.");
+            if (!LK) {
+                return showError("Audio SDK load failed. Please reopen.");
+            }
 
             try {
                 document.getElementById('connection-state').innerText = "Authenticating...";
-                
+
                 const res = await fetch('/api/get-token', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
@@ -273,7 +240,7 @@
                 room.on(LK.RoomEvent.ParticipantConnected, renderUsers);
                 room.on(LK.RoomEvent.ParticipantDisconnected, renderUsers);
                 room.on(LK.RoomEvent.ActiveSpeakersChanged, handleSpeakers);
-                
+
                 room.on(LK.RoomEvent.DataReceived, (payload) => {
                     try {
                         const msgObj = JSON.parse(new TextDecoder().decode(payload));
@@ -290,7 +257,7 @@
                 renderUsers();
             } catch (err) {
                 console.error(err);
-                showError(err.message);
+                showError(err.message || "Connection failed");
             }
         }
 
@@ -307,11 +274,11 @@
                 try { meta = JSON.parse(p.metadata || "{}"); } catch(e) {}
 
                 const card = document.createElement('div');
-                card.className = "flex flex-col items-center gap-1.5 transition-all";
+                card.className = "flex flex-col items-center gap-1.5";
 
                 const bubble = document.createElement('div');
                 bubble.id = `user-${p.identity}`;
-                bubble.className = `relative w-16 h-16 rounded-full border-2 ${meta.is_owner ? 'border-amber-400 shadow-amber-400/20 shadow-md' : 'dark:border-white/10 border-slate-300'} flex items-center justify-center dark:bg-slate-800 bg-white overflow-hidden shadow-lg transition-all`;
+                bubble.className = `relative w-16 h-16 rounded-full border-2 ${meta.is_owner ? 'border-amber-400 shadow-md shadow-amber-400/20' : 'dark:border-white/10 border-slate-300'} flex items-center justify-center dark:bg-slate-800 bg-white overflow-hidden shadow-lg`;
 
                 if (meta.photo_url) {
                     bubble.innerHTML = `<img src="${meta.photo_url}" class="w-full h-full object-cover">`;
@@ -350,8 +317,8 @@
             try {
                 isMuted = !isMuted;
                 await room.localParticipant.setMicrophoneEnabled(!isMuted);
-            } catch(err) {
-                console.error("Mic toggle permission error:", err);
+            } catch(e) {
+                console.warn("Mic error:", e);
                 isMuted = true;
             }
             updateMicUI();
@@ -362,7 +329,7 @@
             const icon = document.getElementById('mic-icon');
             if (isMuted) {
                 btn.className = "w-14 h-14 rounded-full bg-rose-600 text-white flex items-center justify-center shadow-lg active:scale-95 transition border-2 border-white/20";
-                icon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 02-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/><line x1="1" y1="1" x2="23" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>`;
+                icon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 02-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/><line x1="2" y1="2" x2="22" y2="22" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>`;
             } else {
                 btn.className = "w-14 h-14 rounded-full bg-gradient-to-tr from-pink-500 via-purple-500 to-indigo-500 text-white flex items-center justify-center shadow-lg shadow-purple-500/40 active:scale-95 transition border-2 border-white/20";
                 icon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 02-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/>`;
@@ -379,4 +346,78 @@
             });
             const btn = document.getElementById('spk-btn');
             btn.className = isSpeakerOn 
-            
+                ? "w-11 h-11 rounded-full dark:bg-slate-700/40 bg-slate-200 border dark:border-white/10 border-slate-300 dark:text-slate-200 text-slate-700 flex items-center justify-center active:scale-90 transition" 
+                : "w-11 h-11 rounded-full dark:bg-slate-800 bg-slate-300 text-slate-400 flex items-center justify-center active:scale-90 transition";
+        }
+
+        function toggleChatInput() {
+            const bar = document.getElementById('chat-input-bar');
+            bar.classList.toggle('hidden');
+            if (!bar.classList.contains('hidden')) {
+                document.getElementById('chat-input').focus();
+            }
+        }
+
+        function handleSendChat(e) {
+            e.preventDefault();
+            const input = document.getElementById('chat-input');
+            const msg = input.value.trim();
+            if (!msg || !room) return;
+
+            const myName = room.localParticipant.name || "Me";
+            const payload = JSON.stringify({ name: myName, text: msg });
+            room.localParticipant.publishData(new TextEncoder().encode(payload), { reliable: true });
+
+            displayFloatingMessage(myName, msg, true);
+            input.value = "";
+            toggleChatInput();
+        }
+
+        function displayFloatingMessage(name, text, isMe) {
+            const overlay = document.getElementById('live-chat-overlay');
+            if (overlay.children.length >= MAX_MESSAGES) {
+                overlay.removeChild(overlay.firstChild);
+            }
+
+            const item = document.createElement('div');
+            item.className = `chat-bubble-enter max-w-[85%] px-3.5 py-2 rounded-2xl text-xs backdrop-blur-md shadow-lg pointer-events-auto transition-all ${
+                isMe 
+                ? 'self-end bg-gradient-to-r from-pink-500/90 to-indigo-600/90 text-white rounded-br-sm' 
+                : 'self-start dark:bg-slate-800/90 bg-white/90 dark:text-slate-200 text-slate-800 border dark:border-white/10 border-slate-200 rounded-bl-sm'
+            }`;
+            item.innerHTML = `<span class="font-bold block text-[10px] ${isMe ? 'text-pink-100' : 'text-indigo-500'} mb-0.5">${name}</span><p class="leading-relaxed break-words">${text}</p>`;
+
+            overlay.appendChild(item);
+
+            setTimeout(() => {
+                if (item.parentNode === overlay) {
+                    overlay.removeChild(item);
+                }
+            }, MESSAGE_LIFETIME);
+        }
+
+        async function leaveSpace() {
+            if (room) await room.disconnect();
+            if (tg && tg.close) tg.close();
+            else window.close();
+        }
+
+        // Initialize after DOM is fully loaded
+        window.addEventListener('DOMContentLoaded', () => {
+            try {
+                const saved = localStorage.getItem('theme_pref') || 'dark';
+                setTheme(saved);
+            } catch(e) {}
+
+            let attempts = 0;
+            const timer = setInterval(() => {
+                attempts++;
+                if (getLiveKit() || attempts > 25) {
+                    clearInterval(timer);
+                    startVoiceSession();
+                }
+            }, 100);
+        });
+    </script>
+</body>
+</html>
