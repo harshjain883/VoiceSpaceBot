@@ -33,7 +33,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Static files mount
 if os.path.exists("static"):
     app.mount("/static", StaticFiles(directory="static"), name="static")
 
@@ -57,11 +56,10 @@ class ModerateRequest(BaseModel):
     chat_id: str
     init_data: str
     target_user_id: int
-    action: str  # "mute", "unmute", ya "kick"
+    action: str  # "mute", "unmute", or "kick"
 
 
 def verify_telegram_init_data(init_data: str, bot_token: str):
-    """Verifies Telegram WebApp initData HMAC-SHA256 signature"""
     try:
         parsed = dict(parse_qsl(init_data, keep_blank_values=True))
         hash_check = parsed.pop("hash", None)
@@ -82,7 +80,6 @@ def verify_telegram_init_data(init_data: str, bot_token: str):
 
 @app.post("/api/get-token")
 async def get_token(req: TokenRequest):
-    # 1. Telegram WebApp Authentication
     is_valid, user_data = verify_telegram_init_data(req.init_data, BOT_TOKEN)
     if not is_valid or not user_data:
         raise HTTPException(status_code=401, detail="Invalid Telegram authentication data")
@@ -92,7 +89,6 @@ async def get_token(req: TokenRequest):
     username = user_data.get("username", "")
     photo_url = user_data.get("photo_url", "")
 
-    # Parse incoming parameter
     incoming_param = req.chat_id.replace("vc_", "").replace("room_", "")
     
     if "x" in incoming_param:
@@ -123,10 +119,9 @@ async def get_token(req: TokenRequest):
     if not room_data:
         raise HTTPException(status_code=404, detail="Voice Space is not active.")
 
-    # Dynamic One-Time Session Link Check
     active_session = room_data.get("active_session")
     if active_session and incoming_param != active_session:
-        raise HTTPException(status_code=403, detail="Session expired. Please join using the newest group link.")
+        raise HTTPException(status_code=403, detail="Session expired. Please use the newest link.")
 
     group_title = room_data.get("title", "Voice Space")
     admins = room_data.get("admins", [])
@@ -216,7 +211,6 @@ async def end_room(req: EndRoomRequest):
     return {"status": "ok"}
 
 
-# --- STRICT HIERARCHY MODERATION ENDPOINT ---
 @app.post("/api/moderate-user")
 async def moderate_user(req: ModerateRequest):
     is_valid, user_data = verify_telegram_init_data(req.init_data, BOT_TOKEN)
@@ -240,15 +234,14 @@ async def moderate_user(req: ModerateRequest):
     caller_is_owner = caller_id in OWNER_IDS
     caller_is_admin = caller_id in admins
 
-    # 1. Action lene wala ya toh Bot Owner ho ya Group Admin
     if not caller_is_owner and not caller_is_admin:
         raise HTTPException(status_code=403, detail="Permission Denied")
 
-    # 2. Bot Owner par koi action nahi le sakta (Immunity)
+    # Bot Owner immunity
     if req.target_user_id in OWNER_IDS:
         raise HTTPException(status_code=403, detail="Cannot moderate Bot Owner")
 
-    # 3. Group Admin kisi doosre Group Admin ko moderate nahi kar sakta (Sirf Bot Owner kar sakta hai)
+    # Admin cannot moderate other admins
     target_is_admin = req.target_user_id in admins
     if not caller_is_owner and target_is_admin:
         raise HTTPException(status_code=403, detail="Group Admins can only moderate regular members")
@@ -257,17 +250,35 @@ async def moderate_user(req: ModerateRequest):
     room_name = f"room_{normalized_chat_id}"
     try:
         if req.action == "kick":
+            # Instantly remove participant from SFU Room
             await lk_api.room.remove_participant(
                 api.RoomParticipantIdentity(room=room_name, identity=str(req.target_user_id))
             )
-        elif req.action in ["mute", "unmute"]:
-            is_muted = True if req.action == "mute" else False
+        elif req.action == "mute":
+            # 1. Hardware Track Mute
             await lk_api.room.mute_published_track(
                 api.MuteRoomTrackRequest(
                     room=room_name,
                     identity=str(req.target_user_id),
                     track_sid="",
-                    muted=is_muted
+                    muted=True
+                )
+            )
+            # 2. Revoke publishing permission to lock the microphone
+            await lk_api.room.update_participant(
+                api.UpdateParticipantMetadata(
+                    room=room_name,
+                    identity=str(req.target_user_id),
+                    permission=api.ParticipantPermission(can_publish=False, can_subscribe=True, can_publish_data=True)
+                )
+            )
+        elif req.action == "unmute":
+            # Restore publishing permission so user can toggle mic again
+            await lk_api.room.update_participant(
+                api.UpdateParticipantMetadata(
+                    room=room_name,
+                    identity=str(req.target_user_id),
+                    permission=api.ParticipantPermission(can_publish=True, can_subscribe=True, can_publish_data=True)
                 )
             )
     finally:
