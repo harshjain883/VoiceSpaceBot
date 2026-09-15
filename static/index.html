@@ -123,7 +123,7 @@
             <span id="output-label" class="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Speaker</span>
         </div>
 
-        <!-- 2. Hero Mic Button (Telegram Centerpiece) -->
+        <!-- 2. Hero Mic Button (Centerpiece) -->
         <div class="flex flex-col items-center gap-1.5 flex-1 -mt-4">
             <button id="mic-btn" onclick="toggleMic()" class="w-16 h-16 rounded-full bg-gradient-to-tr from-sky-500 to-sky-400 text-white flex items-center justify-center shadow-lg shadow-sky-500/30 active:scale-95 transition relative border-2 border-white/40 dark:border-white/20">
                 <svg id="mic-icon" class="w-7 h-7" fill="currentColor" viewBox="0 0 24 24">
@@ -179,7 +179,7 @@
                 <span id="modal-role" class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full inline-block mt-1"></span>
             </div>
 
-            <!-- Volume Slider (Fully Functional) -->
+            <!-- Volume Slider -->
             <div id="modal-volume-box" class="space-y-2 pt-2 border-t border-white/10 text-left">
                 <div class="flex justify-between items-center text-xs">
                     <span class="text-slate-400">User Volume</span>
@@ -227,14 +227,14 @@
         let isSpeakingNow = false;
         let myPhotoUrl = "";
         let localAudioTrack = null;
-        let micInitialized = false;
+        let globalMediaStream = null;
 
         let currentChatId = "";
         let amIBotOwner = false;
         let amIGroupAdmin = false;
         let amIHardLocked = false;
         let participantStates = {};
-        let userVolumes = {}; // Stores custom user volumes: { identity: volumeValue }
+        let userVolumes = {};
 
         let bluetoothDeviceId = null;
         let currentSinkId = "default";
@@ -322,7 +322,6 @@
                         const audioEl = track.attach();
                         audioEl.id = `audio-${p.identity}`;
                         
-                        // Apply previously saved volume if exists
                         const savedVol = userVolumes[p.identity] !== undefined ? userVolumes[p.identity] : 100;
                         audioEl.volume = savedVol / 100;
 
@@ -349,6 +348,9 @@
                             if (msg.targetId === myId) {
                                 if (msg.state.is_muted) {
                                     amIHardLocked = true;
+                                    if (globalMediaStream) {
+                                        globalMediaStream.getAudioTracks().forEach(t => t.enabled = false);
+                                    }
                                     if (localAudioTrack) await localAudioTrack.mute();
                                     isMuted = true;
                                     isSpeakingNow = false;
@@ -370,8 +372,6 @@
                 });
 
                 await room.connect(data.livekit_url, data.token);
-
-                await initMicrophoneOnce();
                 await detectAudioDevices();
 
                 document.getElementById('connection-state').innerText = "Connected";
@@ -384,40 +384,52 @@
             }
         }
 
-        async function initMicrophoneOnce() {
-            if (micInitialized) return;
-            const LK = getLiveKit();
-            try {
-                localAudioTrack = await LK.createLocalAudioTrack({
-                    echoCancellation: true, noiseSuppression: true, autoGainControl: true
-                });
-                await localAudioTrack.mute();
-                await room.localParticipant.publishTrack(localAudioTrack);
-                micInitialized = true;
-                isMuted = true;
-            } catch(e) {
-                console.warn("Mic init:", e);
-            }
-        }
-
+        // MIC TOGGLE: Single Permission with Stream Reuse on Rejoin
         async function toggleMic() {
             if (!room) return;
             if (amIHardLocked) {
                 return showAppDialog("An Administrator has locked your microphone.");
             }
 
-            if (!localAudioTrack) {
-                await initMicrophoneOnce();
+            const LK = getLiveKit();
+            const activeTrack = globalMediaStream?.getAudioTracks()[0];
+            const isTrackDead = !activeTrack || activeTrack.readyState === 'ended';
+
+            if (isTrackDead) {
+                try {
+                    globalMediaStream = await navigator.mediaDevices.getUserMedia({
+                        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+                        video: false
+                    });
+                    
+                    const newTrack = globalMediaStream.getAudioTracks()[0];
+                    localAudioTrack = new LK.LocalAudioTrack(newTrack);
+                    await room.localParticipant.publishTrack(localAudioTrack);
+                    
+                    isMuted = false;
+                    newTrack.enabled = true;
+                    updateMicUI();
+                    return;
+                } catch (err) {
+                    showAppDialog("Microphone permission denied. Please allow mic access in browser/app settings.");
+                    return;
+                }
+            }
+
+            if (!room.localParticipant.getTrackPublication(LK.Track.Source.Microphone)) {
+                localAudioTrack = new LK.LocalAudioTrack(activeTrack);
+                await room.localParticipant.publishTrack(localAudioTrack);
             }
 
             if (isMuted) {
-                await localAudioTrack.unmute();
+                activeTrack.enabled = true;
                 isMuted = false;
             } else {
-                await localAudioTrack.mute();
+                activeTrack.enabled = false;
                 isMuted = true;
                 isSpeakingNow = false;
             }
+
             updateMicUI();
         }
 
@@ -537,7 +549,7 @@
             roleEl.innerText = meta.is_owner ? "Bot Owner" : (meta.is_admin ? "Group Admin" : "Member");
             roleEl.className = `text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full inline-block mt-1 ${meta.is_owner ? 'bg-amber-400/20 text-amber-500 dark:text-amber-400' : (meta.is_admin ? 'bg-sky-400/20 text-sky-500 dark:text-sky-400' : 'bg-slate-500/20 text-slate-600 dark:text-slate-400')}`;
 
-            // Volume Control Attachment
+            // Volume Control Setup
             const volumeBox = document.getElementById('modal-volume-box');
             const volumeSlider = document.getElementById('user-volume-slider');
             const volumeDisplay = document.getElementById('volume-val-display');
@@ -550,7 +562,6 @@
                 volumeSlider.value = currentVol;
                 volumeDisplay.innerText = `${currentVol}%`;
 
-                // Live volume adjustment handler
                 volumeSlider.oninput = (e) => {
                     const newVol = parseInt(e.target.value, 10);
                     volumeDisplay.innerText = `${newVol}%`;
@@ -711,10 +722,19 @@
             setTimeout(() => { if (item.parentNode === overlay) overlay.removeChild(item); }, 15000);
         }
 
+        // LEAVE SPACE: Releases room without killing media stream to prevent pop-up on re-entry
         async function leaveSpace() {
-            if (localAudioTrack) { localAudioTrack.stop(); }
-            if (room) await room.disconnect();
-            if (tg && tg.close) tg.close(); else window.close();
+            if (globalMediaStream) {
+                globalMediaStream.getAudioTracks().forEach(t => t.enabled = false);
+            }
+            if (room) {
+                await room.disconnect();
+            }
+            if (tg && tg.close) {
+                tg.close();
+            } else {
+                window.close();
+            }
         }
 
         function toggleTheme() {
