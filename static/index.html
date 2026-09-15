@@ -22,7 +22,6 @@
         html.dark .glass-pill { background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.08); }
         html.light .glass-pill { background: rgba(0, 0, 0, 0.04); border: 1px solid rgba(0, 0, 0, 0.06); }
 
-        /* Telegram Native Chat Floating Pill */
         .tg-chat-bubble {
             animation: slideUpPill 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
             background: rgba(23, 30, 42, 0.92);
@@ -32,12 +31,11 @@
         }
         @keyframes slideUpPill { from { opacity: 0; transform: translateY(10px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
 
-        /* Native Telegram Aesthetic Dock */
         .aesthetic-dock {
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
             border-radius: 36px;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
         }
         html.dark .aesthetic-dock {
             background: rgba(18, 24, 37, 0.75);
@@ -50,7 +48,6 @@
             box-shadow: 0 10px 30px -5px rgba(15, 23, 42, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.9);
         }
 
-        /* Hero Mic Ripple Glow when Speaking */
         .mic-speaking-glow {
             box-shadow: 0 0 0 6px rgba(34, 197, 94, 0.25), 0 0 25px rgba(34, 197, 94, 0.55);
             animation: rippleGlow 1.3s ease-in-out infinite alternate;
@@ -70,7 +67,6 @@
 
     <div id="remote-audio-container" class="hidden"></div>
 
-    <!-- Header Bar -->
     <header class="glass-panel p-3.5 rounded-2xl flex items-center justify-between shadow-xl relative z-10">
         <div class="flex items-center gap-3 overflow-hidden">
             <span id="status-dot" class="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0 animate-pulse"></span>
@@ -88,15 +84,12 @@
         </div>
     </header>
 
-    <!-- Center Stage: Participant Grid -->
     <main class="flex-1 flex flex-col items-center justify-start pt-6 relative z-10 overflow-hidden">
         <div id="grid" class="w-full h-full max-h-[46vh] grid grid-cols-3 gap-y-6 gap-x-4 auto-rows-max overflow-y-auto px-2 items-start justify-center"></div>
     </main>
 
-    <!-- Telegram-Style Floating Messages With Avatar -->
     <div id="live-chat-overlay" class="absolute bottom-28 left-4 right-4 z-20 flex flex-col items-center justify-end space-y-2 pointer-events-none max-h-44 overflow-hidden"></div>
 
-    <!-- Inline Quick Chat Input -->
     <div id="chat-input-bar" class="hidden absolute bottom-28 left-4 right-4 z-30 pointer-events-auto">
         <form onsubmit="handleSendChat(event)" class="glass-panel p-2 rounded-2xl flex gap-2 shadow-2xl">
             <input id="chat-input" type="text" placeholder="Type a message into voice chat..." autocomplete="off" class="flex-1 px-4 py-2.5 rounded-xl dark:bg-slate-900 bg-white border border-white/10 dark:text-white text-slate-900 text-xs outline-none focus:border-sky-500">
@@ -104,26 +97,31 @@
         </form>
     </div>
 
-    <!-- Error Banner -->
     <div id="error-banner" class="hidden glass-pill bg-rose-500/20 text-rose-400 text-xs px-4 py-2 rounded-xl text-center mb-2 relative z-10 mx-auto max-w-xs shadow-lg"></div>
 
     <!-- Aesthetic Bottom Dock Controls -->
     <footer class="aesthetic-dock w-full max-w-sm mx-auto px-4 py-3 flex items-center justify-between relative z-10 mb-2">
         
-        <!-- 1. Speaker / Output Button -->
+        <!-- Fast Instant Audio Route Button (Loud Speaker / Bluetooth / Earpiece) -->
         <div class="flex flex-col items-center gap-1.5 flex-1">
-            <button id="spk-btn" onclick="toggleAudioOutput()" class="w-12 h-12 rounded-full bg-sky-500/15 dark:bg-sky-400/20 text-sky-600 dark:text-sky-400 border border-sky-500/30 flex items-center justify-center shadow-sm active:scale-90 transition">
+            <button id="spk-btn" onclick="cycleAudioRoute()" class="w-12 h-12 rounded-full bg-sky-500/15 dark:bg-sky-400/20 text-sky-600 dark:text-sky-400 border border-sky-500/30 flex items-center justify-center shadow-sm active:scale-90 transition">
+                <!-- Loudspeaker Icon -->
                 <svg id="icon-speaker" class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M7 9v6h4l5 5V4L11 9H7z"/>
+                    <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
                 </svg>
+                <!-- Bluetooth Icon -->
                 <svg id="icon-bluetooth" class="w-5 h-5 hidden" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M17.71 7.71L12 2h-1v7.59L6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 11 14.41V22h1l5.71-5.71-4.3-4.29 4.3-4.29zM13 5.83l1.88 1.88L13 9.59V5.83zm1.88 10.46L13 18.17v-3.76l1.88 1.88z"/>
+                </svg>
+                <!-- Phone Calling Earpiece Icon -->
+                <svg id="icon-earpiece" class="w-5 h-5 hidden" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M6.62 10.79a15.053 15.053 0 006.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/>
                 </svg>
             </button>
             <span id="output-label" class="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Speaker</span>
         </div>
 
-        <!-- 2. Hero Mic Button (Centerpiece) -->
+        <!-- Hero Center Mic -->
         <div class="flex flex-col items-center gap-1.5 flex-1 -mt-4">
             <button id="mic-btn" onclick="toggleMic()" class="w-16 h-16 rounded-full bg-gradient-to-tr from-sky-500 to-sky-400 text-white flex items-center justify-center shadow-lg shadow-sky-500/30 active:scale-95 transition relative border-2 border-white/40 dark:border-white/20">
                 <svg id="mic-icon" class="w-7 h-7" fill="currentColor" viewBox="0 0 24 24">
@@ -133,7 +131,7 @@
             <span id="mic-status-label" class="text-[11px] font-bold text-slate-800 dark:text-slate-200">Unmute</span>
         </div>
 
-        <!-- 3. Message Button -->
+        <!-- Message Button -->
         <div class="flex flex-col items-center gap-1.5 flex-1">
             <button onclick="toggleChatInput()" class="w-12 h-12 rounded-full bg-emerald-500/15 dark:bg-emerald-400/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center justify-center shadow-sm active:scale-90 transition">
                 <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -143,7 +141,7 @@
             <span id="msg-label" class="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Message</span>
         </div>
 
-        <!-- 4. Leave Button -->
+        <!-- Leave Button -->
         <div class="flex flex-col items-center gap-1.5 flex-1">
             <button onclick="leaveSpace()" class="w-12 h-12 rounded-full bg-rose-500/15 dark:bg-rose-400/20 text-rose-600 dark:text-rose-400 border border-rose-500/30 flex items-center justify-center shadow-sm active:scale-90 transition">
                 <svg class="w-5 h-5 rotate-135" fill="currentColor" viewBox="0 0 24 24">
@@ -155,7 +153,6 @@
 
     </footer>
 
-    <!-- Native App Custom Modal -->
     <div id="custom-app-dialog" class="hidden fixed inset-0 z-50 bg-black/65 backdrop-blur-sm flex items-center justify-center p-5">
         <div class="glass-panel p-5 rounded-3xl max-w-xs w-full text-left space-y-3 shadow-2xl border border-white/10">
             <div class="flex items-center justify-between">
@@ -179,7 +176,6 @@
                 <span id="modal-role" class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full inline-block mt-1"></span>
             </div>
 
-            <!-- Volume Slider -->
             <div id="modal-volume-box" class="space-y-2 pt-2 border-t border-white/10 text-left">
                 <div class="flex justify-between items-center text-xs">
                     <span class="text-slate-400">User Volume</span>
@@ -188,7 +184,6 @@
                 <input id="user-volume-slider" type="range" min="0" max="100" value="100" class="w-full h-1.5 bg-slate-700 rounded-lg accent-sky-500 cursor-pointer">
             </div>
 
-            <!-- Moderation Controls -->
             <div id="modal-actions" class="hidden space-y-2 pt-2 border-t border-white/10">
                 <div id="owner-opt-allow-admin" class="hidden text-left flex items-center gap-2 pb-1">
                     <input type="checkbox" id="chk-allow-admin" class="rounded text-indigo-600">
@@ -235,9 +230,9 @@
         let participantStates = {};
         let userVolumes = {};
 
-        let bluetoothDeviceId = null;
-        let currentSinkId = "default";
-        let isSpeakerOn = true;
+        // INSTANT AUDIO ROUTING STATE
+        let currentRoute = 'speaker'; // Default state: 'speaker' | 'bluetooth' | 'earpiece'
+        let cachedDevices = { bluetooth: null, speaker: null, earpiece: null };
 
         function showError(msg) {
             const el = document.getElementById('error-banner');
@@ -251,31 +246,123 @@
             document.querySelectorAll('audio').forEach(a => { if (a.paused && a.srcObject) a.play().catch(() => {}); });
         }
 
-        async function detectAudioDevices() {
+        // BACKGROUND HARDWARE CACHING (Non-blocking)
+        async function refreshAudioDevices() {
             if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
             try {
                 const devices = await navigator.mediaDevices.enumerateDevices();
-                const bt = devices.find(d => 
-                    (d.kind === 'audiooutput' || d.kind === 'audioinput') &&
-                    (d.label.toLowerCase().includes('bluetooth') || d.label.toLowerCase().includes('airpods') || d.label.toLowerCase().includes('buds'))
-                );
+                const outputs = devices.filter(d => d.kind === 'audiooutput');
 
-                const spkIcon = document.getElementById('icon-speaker');
-                const btIcon = document.getElementById('icon-bluetooth');
-                const outLabel = document.getElementById('output-label');
+                cachedDevices = { bluetooth: null, speaker: null, earpiece: null };
 
-                if (bt) {
-                    bluetoothDeviceId = bt.deviceId;
-                    btIcon.classList.remove('hidden');
-                    spkIcon.classList.add('hidden');
-                    outLabel.innerText = "Bluetooth";
-                } else {
-                    bluetoothDeviceId = null;
-                    btIcon.classList.add('hidden');
-                    spkIcon.classList.remove('hidden');
-                    outLabel.innerText = "Speaker";
+                for (const d of outputs) {
+                    const label = (d.label || '').toLowerCase();
+                    if (/bluetooth|buds|airpods|headset|wireless|hands-free|bt/i.test(label)) {
+                        if (!cachedDevices.bluetooth) cachedDevices.bluetooth = d;
+                    } else if (/earpiece|receiver|telephony|handset|call speaker/i.test(label)) {
+                        if (!cachedDevices.earpiece) cachedDevices.earpiece = d;
+                    } else if (/speaker|speakerphone|built-in|loudspeaker/i.test(label) && !/earpiece|receiver/i.test(label)) {
+                        if (!cachedDevices.speaker) cachedDevices.speaker = d;
+                    }
                 }
-            } catch(e) {}
+
+                // If speaker device has no direct label, pick default/built-in
+                if (!cachedDevices.speaker && outputs.length > 0) {
+                    cachedDevices.speaker = outputs.find(d => d.deviceId === 'default') || outputs[0];
+                }
+
+                // Auto-detect Bluetooth as first preference
+                if (cachedDevices.bluetooth) {
+                    currentRoute = 'bluetooth';
+                } else if (currentRoute === 'bluetooth') {
+                    currentRoute = 'speaker';
+                }
+
+                updateRouteUI();
+                applySinkToAllAudio();
+            } catch(e) {
+                console.warn("Device refresh error:", e);
+            }
+        }
+
+        // 0ms INSTANT SWITCH HANDLER
+        function cycleAudioRoute() {
+            if (cachedDevices.bluetooth) {
+                if (currentRoute === 'bluetooth') currentRoute = 'speaker';
+                else if (currentRoute === 'speaker') currentRoute = 'earpiece';
+                else currentRoute = 'bluetooth';
+            } else {
+                if (currentRoute === 'speaker') currentRoute = 'earpiece';
+                else currentRoute = 'speaker';
+            }
+
+            // Immediate UI update (0 delay)
+            updateRouteUI();
+            
+            // Asynchronous parallel hardware switch
+            applySinkToAllAudio();
+        }
+
+        function updateRouteUI() {
+            const spkIcon = document.getElementById('icon-speaker');
+            const btIcon = document.getElementById('icon-bluetooth');
+            const earIcon = document.getElementById('icon-earpiece');
+            const label = document.getElementById('output-label');
+            const btn = document.getElementById('spk-btn');
+
+            spkIcon.classList.add('hidden');
+            btIcon.classList.add('hidden');
+            earIcon.classList.add('hidden');
+
+            if (currentRoute === 'bluetooth') {
+                btIcon.classList.remove('hidden');
+                label.innerText = "Bluetooth";
+                btn.className = "w-12 h-12 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 flex items-center justify-center shadow-sm active:scale-90 transition";
+            } else if (currentRoute === 'earpiece') {
+                earIcon.classList.remove('hidden');
+                label.innerText = "Earpiece";
+                btn.className = "w-12 h-12 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/40 flex items-center justify-center shadow-sm active:scale-90 transition";
+            } else {
+                spkIcon.classList.remove('hidden');
+                label.innerText = "Speaker";
+                btn.className = "w-12 h-12 rounded-full bg-sky-500/15 dark:bg-sky-400/20 text-sky-600 dark:text-sky-400 border border-sky-500/30 flex items-center justify-center shadow-sm active:scale-90 transition";
+            }
+        }
+
+        function getTargetDeviceId() {
+            if (currentRoute === 'bluetooth' && cachedDevices.bluetooth) {
+                return cachedDevices.bluetooth.deviceId;
+            }
+            if (currentRoute === 'earpiece' && cachedDevices.earpiece) {
+                return cachedDevices.earpiece.deviceId;
+            }
+            if (currentRoute === 'speaker' && cachedDevices.speaker) {
+                return cachedDevices.speaker.deviceId;
+            }
+            return ""; // System default fallback
+        }
+
+        // Parallel non-blocking sink application
+        function applySinkToAllAudio() {
+            const targetId = getTargetDeviceId();
+            const audios = document.querySelectorAll('#remote-audio-container audio');
+            
+            // Promise.all prevents sequential lag
+            Promise.all(Array.from(audios).map(audioEl => {
+                if (audioEl.setSinkId) {
+                    return audioEl.setSinkId(targetId).catch(() => {
+                        return audioEl.setSinkId("").catch(() => {});
+                    });
+                }
+                return Promise.resolve();
+            })).catch(() => {});
+        }
+
+        // Hardware connect/disconnect auto listener
+        if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
+            navigator.mediaDevices.addEventListener('devicechange', () => {
+                refreshAudioDevices();
+            });
         }
 
         async function startVoiceSession() {
@@ -325,7 +412,12 @@
                         audioEl.volume = savedVol / 100;
 
                         document.getElementById('remote-audio-container').appendChild(audioEl);
-                        if (currentSinkId && audioEl.setSinkId) audioEl.setSinkId(currentSinkId).catch(() => {});
+                        
+                        // Apply active routing immediately to newly attached track
+                        const targetId = getTargetDeviceId();
+                        if (audioEl.setSinkId && targetId) {
+                            audioEl.setSinkId(targetId).catch(() => {});
+                        }
                         audioEl.play().catch(() => {});
                     }
                 });
@@ -347,9 +439,7 @@
                             if (msg.targetId === myId) {
                                 if (msg.state.is_muted) {
                                     amIHardLocked = true;
-                                    if (localAudioTrack) {
-                                        await localAudioTrack.mute();
-                                    }
+                                    if (localAudioTrack) await localAudioTrack.mute();
                                     isMuted = true;
                                     isSpeakingNow = false;
                                     updateMicUI();
@@ -370,7 +460,9 @@
                 });
 
                 await room.connect(data.livekit_url, data.token);
-                await detectAudioDevices();
+                
+                // Initialize background hardware routing
+                refreshAudioDevices();
 
                 document.getElementById('connection-state').innerText = "Connected";
                 document.getElementById('status-dot').className = "w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0";
@@ -382,7 +474,6 @@
             }
         }
 
-        // STEP 1 FIX: Clean, Instant Hardware Mute/Unmute Toggle
         async function toggleMic() {
             if (!room) return;
             if (amIHardLocked) {
@@ -391,7 +482,6 @@
 
             const LK = getLiveKit();
 
-            // Pehli baar create karo
             if (!localAudioTrack) {
                 try {
                     localAudioTrack = await LK.createLocalAudioTrack({
@@ -402,6 +492,9 @@
                     await room.localParticipant.publishTrack(localAudioTrack);
                     isMuted = false;
                     updateMicUI();
+                    
+                    // Re-scan devices once mic authorization unlocks accurate hardware labels
+                    refreshAudioDevices();
                     return;
                 } catch (err) {
                     showAppDialog("Microphone permission denied. Please allow mic access in browser/app settings.");
@@ -409,7 +502,6 @@
                 }
             }
 
-            // LiveKit official mute / unmute state
             if (isMuted) {
                 await localAudioTrack.unmute();
                 isMuted = false;
@@ -446,37 +538,6 @@
                     btn.classList.add('mic-speaking-glow');
                 } else {
                     btn.classList.remove('mic-speaking-glow');
-                }
-            }
-        }
-
-        async function toggleAudioOutput() {
-            await detectAudioDevices();
-            const audios = document.querySelectorAll('#remote-audio-container audio');
-
-            if (bluetoothDeviceId) {
-                currentSinkId = (currentSinkId === bluetoothDeviceId) ? "default" : bluetoothDeviceId;
-                audios.forEach(a => { if (a.setSinkId) a.setSinkId(currentSinkId).catch(() => {}); });
-                const btIcon = document.getElementById('icon-bluetooth');
-                const outLabel = document.getElementById('output-label');
-                if (currentSinkId === bluetoothDeviceId) {
-                    btIcon.classList.add('text-emerald-300');
-                    outLabel.innerText = "Bluetooth";
-                } else {
-                    btIcon.classList.remove('text-emerald-300');
-                    outLabel.innerText = "Speaker";
-                }
-            } else {
-                isSpeakerOn = !isSpeakerOn;
-                audios.forEach(a => a.muted = !isSpeakerOn);
-                const btn = document.getElementById('spk-btn');
-                const outLabel = document.getElementById('output-label');
-                if (isSpeakerOn) {
-                    btn.className = "w-12 h-12 rounded-full bg-sky-500/15 dark:bg-sky-400/20 text-sky-600 dark:text-sky-400 border border-sky-500/30 flex items-center justify-center shadow-sm active:scale-90 transition";
-                    outLabel.innerText = "Speaker";
-                } else {
-                    btn.className = "w-12 h-12 rounded-full bg-slate-400/20 dark:bg-slate-700 text-slate-500 dark:text-slate-400 border border-slate-400/30 flex items-center justify-center shadow-sm active:scale-90 transition";
-                    outLabel.innerText = "Muted";
                 }
             }
         }
@@ -538,7 +599,6 @@
             roleEl.innerText = meta.is_owner ? "Bot Owner" : (meta.is_admin ? "Group Admin" : "Member");
             roleEl.className = `text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full inline-block mt-1 ${meta.is_owner ? 'bg-amber-400/20 text-amber-500 dark:text-amber-400' : (meta.is_admin ? 'bg-sky-400/20 text-sky-500 dark:text-sky-400' : 'bg-slate-500/20 text-slate-600 dark:text-slate-400')}`;
 
-            // Volume Control Setup
             const volumeBox = document.getElementById('modal-volume-box');
             const volumeSlider = document.getElementById('user-volume-slider');
             const volumeDisplay = document.getElementById('volume-val-display');
@@ -650,7 +710,6 @@
             }
         }
 
-        // STEP 2 FIX: Real-time speaking detection sync
         function handleSpeakers(speakers) {
             document.querySelectorAll('[id^="user-"]').forEach(el => {
                 el.classList.remove('speaking-ring');
@@ -717,7 +776,6 @@
             setTimeout(() => { if (item.parentNode === overlay) overlay.removeChild(item); }, 15000);
         }
 
-        // STEP 3 FIX: Safe Leave Cleanup
         async function leaveSpace() {
             if (localAudioTrack) {
                 try {
