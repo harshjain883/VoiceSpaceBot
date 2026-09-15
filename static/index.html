@@ -3,29 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
-    <title>Voice Space ✨</title>
+    <title>Voice Space</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/livekit-client@2.5.9/dist/livekit-client.umd.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        * { font-family: 'Plus Jakarta Sans', -apple-system, sans-serif; }
         body {
-            background: radial-gradient(circle at 50% 10%, #1e1b4b 0%, #0f172a 45%, #090d16 100%);
+            background: #090d16;
             color: #f8fafc;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         }
         .speaking {
-            animation: cute-pulse 1.4s infinite ease-in-out;
             border-color: #38bdf8 !important;
-            box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.35), 0 0 25px rgba(129, 140, 248, 0.5) !important;
-        }
-        @keyframes cute-pulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.06); }
+            box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.4), 0 0 20px rgba(56, 189, 248, 0.6) !important;
         }
         .glass-panel {
-            background: rgba(30, 41, 59, 0.55);
+            background: rgba(30, 41, 59, 0.7);
             backdrop-filter: blur(16px);
             -webkit-backdrop-filter: blur(16px);
             border: 1px solid rgba(255, 255, 255, 0.08);
@@ -35,120 +28,69 @@
             backdrop-filter: blur(12px);
             border: 1px solid rgba(255, 255, 255, 0.1);
         }
-        ::-webkit-scrollbar { width: 4px; }
-        ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 9999px; }
     </style>
 </head>
 <body class="h-screen flex flex-col justify-between p-4 select-none relative overflow-hidden">
 
-    <!-- Ambient Cute Glow Blobs -->
-    <div class="absolute -top-24 -left-20 w-64 h-64 bg-violet-600/20 rounded-full blur-3xl pointer-events-none"></div>
-    <div class="absolute top-1/2 -right-24 w-72 h-72 bg-pink-500/15 rounded-full blur-3xl pointer-events-none"></div>
-    <div class="absolute -bottom-20 left-1/3 w-60 h-60 bg-sky-500/15 rounded-full blur-3xl pointer-events-none"></div>
-
-    <!-- Top Floating Header -->
-    <header class="glass-panel p-3.5 rounded-3xl flex items-center justify-between shadow-xl relative z-10">
+    <!-- Top Status Bar -->
+    <header class="glass-panel p-3.5 rounded-2xl flex items-center justify-between shadow-xl relative z-10">
         <div class="flex items-center gap-3 overflow-hidden">
-            <div class="relative flex items-center justify-center w-8 h-8 rounded-2xl bg-gradient-to-tr from-pink-500 to-indigo-500 text-white text-xs shadow-md shadow-pink-500/20 shrink-0">
-                <span>🎙️</span>
-                <span id="status-dot" class="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-amber-400 border-2 border-[#0f172a]"></span>
-            </div>
+            <span id="status-dot" class="w-3 h-3 rounded-full bg-amber-400 shrink-0 animate-pulse"></span>
             <div class="flex flex-col truncate">
-                <span class="text-sm font-extrabold text-white truncate tracking-tight" id="group-title">
-                    Voice Space ✨
-                </span>
-                <span class="text-[10px] font-medium text-indigo-300/80" id="connection-state">Connecting cozy space...</span>
+                <span class="text-sm font-bold text-white truncate" id="group-title">Connecting...</span>
+                <span class="text-[10px] text-slate-400" id="connection-state">Connecting space...</span>
             </div>
         </div>
         
         <div class="flex items-center gap-2">
-            <div class="glass-pill px-3 py-1.5 rounded-2xl flex items-center gap-1.5 text-xs font-semibold text-slate-200">
-                <span class="text-[11px]">👥</span>
-                <span id="participant-count">0</span>
+            <div class="glass-pill px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-200">
+                <span id="participant-count">0</span> Online
             </div>
-            <!-- Chat Trigger Button -->
-            <button onclick="toggleChat()" class="glass-pill p-2 rounded-2xl text-slate-200 hover:text-pink-300 transition-all active:scale-95 relative">
-                <i data-lucide="message-square" class="w-4 h-4 text-pink-400"></i>
-                <span id="chat-badge" class="hidden absolute -top-1 -right-1 w-2.5 h-2.5 bg-pink-500 rounded-full ring-2 ring-indigo-900 animate-bounce"></span>
+            <button onclick="toggleChat()" class="glass-pill p-2 rounded-xl text-slate-200 hover:text-white transition active:scale-95 relative">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+                <span id="chat-badge" class="hidden absolute -top-1 -right-1 w-2 h-2 bg-pink-500 rounded-full"></span>
             </button>
         </div>
     </header>
 
-    <!-- Center Stage: Grid Member Bubbles -->
+    <!-- Participant Grid -->
     <main class="flex-1 flex flex-col items-center justify-center py-4 relative z-10 overflow-hidden">
-        <div id="grid" class="w-full h-full max-h-[65vh] grid grid-cols-3 gap-y-6 gap-x-4 auto-rows-max overflow-y-auto px-2 py-4 items-center justify-center"></div>
+        <div id="grid" class="w-full h-full max-h-[65vh] grid grid-cols-3 gap-4 auto-rows-max overflow-y-auto p-2 items-center justify-center"></div>
     </main>
 
-    <!-- Error/Notice Toast -->
-    <div id="error-banner" class="hidden glass-pill bg-rose-500/10 border-rose-500/30 text-rose-300 text-xs px-4 py-2.5 rounded-2xl text-center mb-3 relative z-10 mx-auto max-w-xs shadow-lg"></div>
+    <!-- Error Banner -->
+    <div id="error-banner" class="hidden glass-pill bg-rose-500/20 border-rose-500/40 text-rose-300 text-xs px-4 py-2 rounded-xl text-center mb-2 relative z-10 mx-auto max-w-xs"></div>
 
-    <!-- Bottom Floating Island Controls -->
-    <footer class="glass-panel px-6 py-3.5 rounded-full max-w-xs mx-auto w-full flex items-center justify-between shadow-2xl relative z-10 mb-2 border border-white/10">
-        <!-- Leave Button -->
-        <button onclick="leaveSpace()" class="w-11 h-11 rounded-full bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/25 text-rose-400 flex items-center justify-center transition active:scale-90">
-            <i data-lucide="phone-off" class="w-4 h-4"></i>
+    <!-- Bottom Controls -->
+    <footer class="glass-panel px-6 py-3 rounded-full max-w-xs mx-auto w-full flex items-center justify-between shadow-2xl relative z-10 mb-2">
+        <!-- Leave -->
+        <button onclick="leaveSpace()" class="w-11 h-11 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-400 flex items-center justify-center active:scale-90 transition">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 8l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M5 3a2 2 0 00-2 2v1c0 8.284 6.716 15 15 15h1a2 2 0 002-2v-3.28a1 1 0 00-.684-.948l-4.493-1.498a1 1 0 00-1.21.502l-1.13 2.257a11.042 11.042 0 01-5.516-5.517l2.257-1.128a1 1 0 00.502-1.21L9.228 3.683A1 1 0 008.279 3H5z"/></svg>
         </button>
 
-        <!-- Center Mute / Unmute Button -->
-        <button id="mic-btn" onclick="toggleMic()" class="w-16 h-16 rounded-full bg-gradient-to-tr from-pink-500 via-purple-500 to-indigo-500 text-white flex items-center justify-center shadow-lg shadow-purple-500/40 transition active:scale-95 border-2 border-white/20">
-            <i id="mic-icon" data-lucide="mic" class="w-6 h-6"></i>
+        <!-- Mic Toggle -->
+        <button id="mic-btn" onclick="toggleMic()" class="w-14 h-14 rounded-full bg-indigo-600 text-white flex items-center justify-center shadow-lg active:scale-95 transition">
+            <svg id="mic-icon" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 02-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/></svg>
         </button>
 
-        <!-- Speaker Button -->
-        <button id="spk-btn" onclick="toggleSpeaker()" class="w-11 h-11 rounded-full bg-slate-700/40 hover:bg-slate-700/60 border border-white/10 text-slate-200 flex items-center justify-center transition active:scale-90">
-            <i id="spk-icon" data-lucide="volume-2" class="w-4 h-4"></i>
+        <!-- Speaker Toggle -->
+        <button id="spk-btn" onclick="toggleSpeaker()" class="w-11 h-11 rounded-full bg-slate-700/50 border border-white/10 text-slate-200 flex items-center justify-center active:scale-90 transition">
+            <svg id="spk-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/></svg>
         </button>
     </footer>
 
-    <!-- Profile & Admin Moderation Modal -->
-    <div id="profile-modal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div class="bg-slate-800 border border-slate-700 w-full max-w-xs rounded-3xl p-6 text-center space-y-4 shadow-2xl">
-            <img id="modal-img" class="w-20 h-20 rounded-full mx-auto border-2 border-pink-500 object-cover bg-slate-700" src="" alt="">
-            <div>
-                <h3 id="modal-name" class="font-bold text-lg text-white"></h3>
-                <p id="modal-role" class="text-xs font-bold uppercase mt-0.5"></p>
-                <p id="modal-username" class="text-xs text-slate-400 mt-1"></p>
-            </div>
-
-            <div id="admin-actions-box" class="hidden space-y-2 pt-2 border-t border-slate-700/60">
-                <div class="grid grid-cols-2 gap-2">
-                    <button id="btn-mod-mute" class="p-2.5 bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 rounded-xl text-xs font-semibold">Mute User</button>
-                    <button id="btn-mod-kick" class="p-2.5 bg-rose-500/20 text-rose-300 hover:bg-rose-500/30 rounded-xl text-xs font-semibold">Kick User</button>
-                </div>
-            </div>
-
-            <button id="modal-open-tg" class="w-full p-3 bg-gradient-to-r from-pink-500 to-indigo-600 rounded-xl font-semibold text-white text-sm transition">Telegram Profile</button>
-            <button onclick="closeProfileModal()" class="w-full p-1 text-slate-400 text-xs">Close</button>
-        </div>
-    </div>
-
-    <!-- Aesthetic Chat Drawer with Group Name in Header -->
-    <div id="chat-drawer" class="hidden absolute inset-0 bg-slate-950/90 backdrop-blur-2xl z-50 flex flex-col p-5 transition-all">
-        <!-- Chat Header Showing Exact Group Name -->
+    <!-- Chat Drawer -->
+    <div id="chat-drawer" class="hidden absolute inset-0 bg-slate-950/95 backdrop-blur-xl z-50 flex flex-col p-4 transition-all">
         <div class="flex items-center justify-between pb-3 border-b border-white/10">
-            <div class="flex items-center gap-2 overflow-hidden">
-                <span class="text-lg">💬</span>
-                <div class="flex flex-col truncate">
-                    <h3 class="font-bold text-sm text-slate-100 truncate" id="chat-group-name">Group Chat</h3>
-                    <span class="text-[10px] text-pink-400 font-medium">In-Room Realtime Messages</span>
-                </div>
-            </div>
-            <button onclick="toggleChat()" class="p-1.5 text-slate-400 hover:text-white rounded-xl bg-white/5 active:scale-90 transition">
-                <i data-lucide="x" class="w-4 h-4"></i>
+            <h3 class="font-bold text-sm text-slate-100" id="chat-group-name">In-Room Chat</h3>
+            <button onclick="toggleChat()" class="p-1 text-slate-400 hover:text-white rounded bg-white/5">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
         </div>
-
-        <div id="chat-box" class="flex-1 overflow-y-auto py-4 space-y-3 text-xs">
-            <div class="text-center text-slate-400 text-[11px] my-2 bg-white/5 py-1.5 px-3 rounded-full w-max mx-auto border border-white/5">
-                🌸 Welcome to voice notes & vibes!
-            </div>
-        </div>
-
-        <form onsubmit="handleSendChat(event)" class="flex gap-2 pt-2">
-            <input id="chat-input" type="text" placeholder="Say something sweet..." autocomplete="off" class="flex-1 px-4 py-3 rounded-2xl bg-white/5 border border-white/10 text-white text-xs placeholder-slate-400 outline-none focus:border-pink-400/50 transition">
-            <button type="submit" class="px-4 py-3 rounded-2xl bg-gradient-to-r from-pink-500 to-indigo-600 text-white text-xs font-semibold shadow-md shadow-pink-500/25 active:scale-95 transition flex items-center justify-center">
-                <i data-lucide="send" class="w-4 h-4"></i>
-            </button>
+        <div id="chat-box" class="flex-1 overflow-y-auto py-3 space-y-2 text-xs"></div>
+        <form onsubmit="handleSendChat(event)" class="flex gap-2 pt-2 border-t border-white/10">
+            <input id="chat-input" type="text" placeholder="Type a message..." autocomplete="off" class="flex-1 px-3 py-2 rounded-xl bg-slate-800 border border-white/10 text-white text-xs outline-none">
+            <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold">Send</button>
         </form>
     </div>
 
@@ -157,28 +99,22 @@
         if (tg) {
             tg.ready();
             tg.expand();
-            if (tg.enableClosingConfirmation) tg.enableClosingConfirmation();
         }
-        if (window.lucide) lucide.createIcons();
 
         let room = null;
         let isMuted = false;
         let isSpeakerOn = true;
         let isChatOpen = false;
-        let currentGroupName = "Voice Space";
-        let myIsAdmin = false;
-        let myIsOwner = false;
 
         const urlParams = new URLSearchParams(window.location.search);
         let rawId = tg?.initDataUnsafe?.start_param || urlParams.get('tgWebAppStartParam') || urlParams.get('chat_id') || "";
-        let finalChatId = rawId ? (rawId.startsWith("-") ? rawId : (rawId.startsWith("100") ? `-${rawId}` : `-100${rawId}`)) : "";
 
         function showError(msg) {
             const el = document.getElementById('error-banner');
-            el.innerText = `✨ ${msg}`;
+            el.innerText = msg;
             el.classList.remove('hidden');
-            document.getElementById('connection-state').innerText = "Notice";
-            document.getElementById('status-dot').className = "absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-pink-500 border-2 border-[#0f172a]";
+            document.getElementById('connection-state').innerText = "Failed";
+            document.getElementById('status-dot').className = "w-3 h-3 rounded-full bg-rose-500 shrink-0";
         }
 
         function getLiveKit() {
@@ -186,21 +122,21 @@
         }
 
         async function startVoiceSession() {
-            if (!finalChatId) {
-                return showError("Chat ID missing. Please join via group /vc button.");
+            if (!rawId) {
+                return showError("Session ID missing. Please join using the link in group.");
             }
 
             const LK = getLiveKit();
-            if (!LK) return showError("Audio engine loading, please retry.");
+            if (!LK) return showError("Audio library load failed. Please reopen.");
 
             try {
-                document.getElementById('connection-state').innerText = "Authenticating profile...";
+                document.getElementById('connection-state').innerText = "Authenticating...";
                 
                 const res = await fetch('/api/get-token', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
-                        chat_id: finalChatId,
+                        chat_id: rawId,
                         init_data: tg?.initData || ""
                     })
                 });
@@ -211,29 +147,18 @@
                 }
 
                 const data = await res.json();
-                currentGroupName = data.group_title || "Voice Space";
-                myIsAdmin = data.is_admin;
-                myIsOwner = data.is_owner;
-
-                // Group name on Main Screen & Chat Drawer
-                document.getElementById('group-title').innerText = `${currentGroupName} ✨`;
-                document.getElementById('chat-group-name').innerText = currentGroupName;
-                document.getElementById('connection-state').innerText = "Connecting room...";
+                document.getElementById('group-title').innerText = data.group_title || "Voice Space";
+                document.getElementById('chat-group-name').innerText = data.group_title || "In-Room Chat";
+                document.getElementById('connection-state').innerText = "Joining SFU...";
 
                 room = new LK.Room({
                     adaptiveStream: true,
-                    dynacast: true,
-                    audioCaptureDefaults: {
-                        echoCancellation: true,
-                        noiseSuppression: true,
-                        autoGainControl: true
-                    }
+                    dynacast: true
                 });
 
                 room.on(LK.RoomEvent.TrackSubscribed, (track) => {
                     if (track.kind === LK.Track.Kind.Audio) {
                         const audio = track.attach();
-                        audio.playsinline = true;
                         audio.autoplay = true;
                         document.body.appendChild(audio);
                     }
@@ -242,8 +167,6 @@
                 room.on(LK.RoomEvent.ParticipantConnected, renderUsers);
                 room.on(LK.RoomEvent.ParticipantDisconnected, renderUsers);
                 room.on(LK.RoomEvent.ActiveSpeakersChanged, handleSpeakers);
-                room.on(LK.RoomEvent.TrackMuted, renderUsers);
-                room.on(LK.RoomEvent.TrackUnmuted, renderUsers);
                 
                 room.on(LK.RoomEvent.DataReceived, (payload) => {
                     try {
@@ -252,14 +175,21 @@
                     } catch(e) {}
                 });
 
+                // Connect to LiveKit Room
                 await room.connect(data.livekit_url, data.token);
-                await room.localParticipant.setMicrophoneEnabled(true);
-                isMuted = false;
-                updateMicButtonUI();
 
-                document.getElementById('connection-state').innerText = "HD Live Connected 🌸";
-                const dot = document.getElementById('status-dot');
-                dot.className = "absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-[#0f172a] animate-pulse";
+                // Publish Mic (non-blocking fallback)
+                try {
+                    await room.localParticipant.setMicrophoneEnabled(true);
+                    isMuted = false;
+                } catch(e) {
+                    console.warn("Mic permission deferred:", e);
+                    isMuted = true;
+                }
+                updateMicUI();
+
+                document.getElementById('connection-state').innerText = "Connected";
+                document.getElementById('status-dot').className = "w-3 h-3 rounded-full bg-emerald-400 shrink-0";
 
                 renderUsers();
             } catch (err) {
@@ -280,53 +210,35 @@
                 let meta = {};
                 try { meta = JSON.parse(p.metadata || "{}"); } catch(e) {}
 
-                // Determine if participant is muted
-                let userIsMuted = true;
-                p.audioTrackPublications.forEach(pub => {
-                    if (pub.track && !pub.isMuted) userIsMuted = false;
-                });
-                if (p === room.localParticipant) {
-                    userIsMuted = isMuted;
-                }
-
                 const card = document.createElement('div');
-                card.className = "flex flex-col items-center gap-1.5 transition-all duration-300 cursor-pointer";
-                card.onclick = () => openProfileModal(p, meta);
+                card.className = "flex flex-col items-center gap-1.5";
 
                 const bubble = document.createElement('div');
                 bubble.id = `user-${p.identity}`;
-                bubble.className = `relative w-16 h-16 rounded-full border-2 ${meta.is_owner ? 'border-amber-400 shadow-md shadow-amber-400/20' : 'border-white/10'} flex items-center justify-center bg-gradient-to-tr from-slate-800 to-indigo-950 overflow-hidden shadow-lg transition-all duration-300`;
+                bubble.className = `relative w-16 h-16 rounded-full border-2 ${meta.is_owner ? 'border-amber-400' : 'border-white/10'} flex items-center justify-center bg-slate-800 overflow-hidden`;
 
                 if (meta.photo_url) {
                     bubble.innerHTML = `<img src="${meta.photo_url}" class="w-full h-full object-cover">`;
                 } else {
                     const initials = (p.name || "U").slice(0, 1).toUpperCase();
-                    bubble.innerHTML = `<span class="font-bold text-base bg-gradient-to-tr from-pink-400 to-indigo-300 bg-clip-text text-transparent">${initials}</span>`;
+                    bubble.innerHTML = `<span class="font-bold text-base text-indigo-400">${initials}</span>`;
                 }
 
-                // Crown for owner
                 if (meta.is_owner) {
                     const badge = document.createElement('span');
-                    badge.className = "absolute top-0 right-0 text-[10px] bg-amber-400 text-slate-900 rounded-full px-1 shadow-sm";
-                    badge.innerText = "👑";
+                    badge.className = "absolute top-0 right-0 text-[10px] bg-amber-400 text-slate-900 rounded-full px-1";
+                    badge.innerText = "★";
                     bubble.appendChild(badge);
                 }
 
-                // Mute status mini-pill on avatar
-                const muteBadge = document.createElement('span');
-                muteBadge.className = `absolute bottom-0 right-0 p-1 rounded-full text-[9px] ${userIsMuted ? 'bg-rose-500 text-white' : 'bg-emerald-500 text-slate-900'} shadow-sm`;
-                muteBadge.innerHTML = userIsMuted ? `<i data-lucide="mic-off" class="w-2.5 h-2.5"></i>` : `<i data-lucide="mic" class="w-2.5 h-2.5"></i>`;
-                bubble.appendChild(muteBadge);
-
                 const label = document.createElement('span');
-                label.className = "text-[11px] text-slate-300 font-semibold truncate max-w-[75px] tracking-tight text-center";
+                label.className = "text-[11px] text-slate-300 font-medium truncate max-w-[75px] text-center";
                 label.innerText = p.name || `User ${p.identity}`;
 
                 card.appendChild(bubble);
                 card.appendChild(label);
                 grid.appendChild(card);
             });
-            if (window.lucide) lucide.createIcons();
         }
 
         function handleSpeakers(speakers) {
@@ -337,27 +249,18 @@
             });
         }
 
-        // Mute / Unmute Toggle Logic
         async function toggleMic() {
             if (!room) return;
             isMuted = !isMuted;
             await room.localParticipant.setMicrophoneEnabled(!isMuted);
-            updateMicButtonUI();
-            renderUsers();
+            updateMicUI();
         }
 
-        function updateMicButtonUI() {
+        function updateMicUI() {
             const btn = document.getElementById('mic-btn');
-            if (isMuted) {
-                // Muted state: Rose/Red with mic-off
-                btn.className = "w-16 h-16 rounded-full bg-rose-600 hover:bg-rose-500 text-white flex items-center justify-center shadow-lg shadow-rose-600/40 transition active:scale-95 border-2 border-white/20";
-                document.getElementById('mic-icon').setAttribute("data-lucide", "mic-off");
-            } else {
-                // Unmuted state: Cute Gradient with mic
-                btn.className = "w-16 h-16 rounded-full bg-gradient-to-tr from-pink-500 via-purple-500 to-indigo-500 text-white flex items-center justify-center shadow-lg shadow-purple-500/40 transition active:scale-95 border-2 border-white/20";
-                document.getElementById('mic-icon').setAttribute("data-lucide", "mic");
-            }
-            if (window.lucide) lucide.createIcons();
+            btn.className = isMuted 
+                ? "w-14 h-14 rounded-full bg-rose-600 text-white flex items-center justify-center shadow-lg active:scale-95 transition"
+                : "w-14 h-14 rounded-full bg-indigo-600 text-white flex items-center justify-center shadow-lg active:scale-95 transition";
         }
 
         function toggleSpeaker() {
@@ -370,5 +273,63 @@
             });
             const btn = document.getElementById('spk-btn');
             btn.className = isSpeakerOn 
-                ? "w-11 h-11 rounded-full bg-slate-700/40 border border-white/10 text-slate-200 flex items-center justify-center active:scale-90 transition" 
-                : "w-11 h-11 rounded-full bg-slate-800 border border-white/5 text-slate-500
+                ? "w-11 h-11 rounded-full bg-slate-700/50 border border-white/10 text-slate-200 flex items-center justify-center active:scale-90 transition" 
+                : "w-11 h-11 rounded-full bg-slate-800 text-slate-500 flex items-center justify-center active:scale-90 transition";
+        }
+
+        function toggleChat() {
+            isChatOpen = !isChatOpen;
+            const drawer = document.getElementById('chat-drawer');
+            const badge = document.getElementById('chat-badge');
+            if (isChatOpen) {
+                drawer.classList.remove('hidden');
+                badge.classList.add('hidden');
+                document.getElementById('chat-input').focus();
+            } else {
+                drawer.classList.add('hidden');
+            }
+        }
+
+        function handleSendChat(e) {
+            e.preventDefault();
+            const input = document.getElementById('chat-input');
+            const msg = input.value.trim();
+            if (!msg || !room) return;
+
+            const myName = room.localParticipant.name || "Me";
+            const payload = JSON.stringify({ name: myName, text: msg });
+            room.localParticipant.publishData(new TextEncoder().encode(payload), { reliable: true });
+
+            appendChatMessage(myName, msg, true);
+            input.value = "";
+        }
+
+        function appendChatMessage(name, text, isMe) {
+            const box = document.getElementById('chat-box');
+            const div = document.createElement('div');
+            div.className = `p-2.5 rounded-xl max-w-[85%] ${isMe ? 'ml-auto bg-indigo-600 text-white' : 'bg-slate-800 text-slate-200'}`;
+            div.innerHTML = `<span class="block text-[10px] opacity-70 mb-0.5">${name}</span><p class="break-words">${text}</p>`;
+            box.appendChild(div);
+            box.scrollTop = box.scrollHeight;
+            if (!isChatOpen && !isMe) document.getElementById('chat-badge').classList.remove('hidden');
+        }
+
+        async function leaveSpace() {
+            if (room) await room.disconnect();
+            if (tg && tg.close) tg.close();
+            else window.close();
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            let attempts = 0;
+            const timer = setInterval(() => {
+                attempts++;
+                if (getLiveKit() || attempts > 30) {
+                    clearInterval(timer);
+                    startVoiceSession();
+                }
+            }, 100);
+        });
+    </script>
+</body>
+</html>
