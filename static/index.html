@@ -99,10 +99,10 @@
 
     <div id="error-banner" class="hidden glass-pill bg-rose-500/20 text-rose-400 text-xs px-4 py-2 rounded-xl text-center mb-2 relative z-10 mx-auto max-w-xs shadow-lg"></div>
 
-    <!-- Aesthetic Bottom Dock Controls -->
+    <!-- Dock Controls -->
     <footer class="aesthetic-dock w-full max-w-sm mx-auto px-4 py-3 flex items-center justify-between relative z-10 mb-2">
         
-        <!-- Fast Instant Audio Route Button (Loud Speaker / Bluetooth / Earpiece) -->
+        <!-- Fast Instant Audio Routing Button -->
         <div class="flex flex-col items-center gap-1.5 flex-1">
             <button id="spk-btn" onclick="cycleAudioRoute()" class="w-12 h-12 rounded-full bg-sky-500/15 dark:bg-sky-400/20 text-sky-600 dark:text-sky-400 border border-sky-500/30 flex items-center justify-center shadow-sm active:scale-90 transition">
                 <!-- Loudspeaker Icon -->
@@ -113,7 +113,7 @@
                 <svg id="icon-bluetooth" class="w-5 h-5 hidden" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M17.71 7.71L12 2h-1v7.59L6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 11 14.41V22h1l5.71-5.71-4.3-4.29 4.3-4.29zM13 5.83l1.88 1.88L13 9.59V5.83zm1.88 10.46L13 18.17v-3.76l1.88 1.88z"/>
                 </svg>
-                <!-- Phone Calling Earpiece Icon -->
+                <!-- Earpiece (Calling Speaker) Icon -->
                 <svg id="icon-earpiece" class="w-5 h-5 hidden" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M6.62 10.79a15.053 15.053 0 006.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/>
                 </svg>
@@ -121,7 +121,7 @@
             <span id="output-label" class="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Speaker</span>
         </div>
 
-        <!-- Hero Center Mic -->
+        <!-- Center Hero Mic -->
         <div class="flex flex-col items-center gap-1.5 flex-1 -mt-4">
             <button id="mic-btn" onclick="toggleMic()" class="w-16 h-16 rounded-full bg-gradient-to-tr from-sky-500 to-sky-400 text-white flex items-center justify-center shadow-lg shadow-sky-500/30 active:scale-95 transition relative border-2 border-white/40 dark:border-white/20">
                 <svg id="mic-icon" class="w-7 h-7" fill="currentColor" viewBox="0 0 24 24">
@@ -153,6 +153,7 @@
 
     </footer>
 
+    <!-- Custom In-App Modal (Clean) -->
     <div id="custom-app-dialog" class="hidden fixed inset-0 z-50 bg-black/65 backdrop-blur-sm flex items-center justify-center p-5">
         <div class="glass-panel p-5 rounded-3xl max-w-xs w-full text-left space-y-3 shadow-2xl border border-white/10">
             <div class="flex items-center justify-between">
@@ -230,9 +231,10 @@
         let participantStates = {};
         let userVolumes = {};
 
-        // INSTANT AUDIO ROUTING STATE
-        let currentRoute = 'speaker'; // Default state: 'speaker' | 'bluetooth' | 'earpiece'
+        // RELIABLE HARDWARE ROUTING STATE
+        let currentRoute = 'speaker'; // 'speaker' | 'bluetooth' | 'earpiece'
         let cachedDevices = { bluetooth: null, speaker: null, earpiece: null };
+        let hasHardwareAccess = false;
 
         function showError(msg) {
             const el = document.getElementById('error-banner');
@@ -246,18 +248,23 @@
             document.querySelectorAll('audio').forEach(a => { if (a.paused && a.srcObject) a.play().catch(() => {}); });
         }
 
-        // BACKGROUND HARDWARE CACHING (Non-blocking)
+        // HARDWARE AUDIO DETECTION (Handles Mobile Privacy Masking)
         async function refreshAudioDevices() {
             if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
             try {
                 const devices = await navigator.mediaDevices.enumerateDevices();
                 const outputs = devices.filter(d => d.kind === 'audiooutput');
 
+                // Check if browser reveals actual device labels (requires 1-time mic access on phone)
+                const hasLabels = outputs.some(d => d.label && d.label.length > 0);
+                if (hasLabels) hasHardwareAccess = true;
+
                 cachedDevices = { bluetooth: null, speaker: null, earpiece: null };
 
                 for (const d of outputs) {
                     const label = (d.label || '').toLowerCase();
-                    if (/bluetooth|buds|airpods|headset|wireless|hands-free|bt/i.test(label)) {
+                    // Detect all wireless/bluetooth/earbuds profiles
+                    if (/bluetooth|buds|airpod|headset|wireless|hands-free|bt|tws|headphone/i.test(label)) {
                         if (!cachedDevices.bluetooth) cachedDevices.bluetooth = d;
                     } else if (/earpiece|receiver|telephony|handset|call speaker/i.test(label)) {
                         if (!cachedDevices.earpiece) cachedDevices.earpiece = d;
@@ -266,12 +273,11 @@
                     }
                 }
 
-                // If speaker device has no direct label, pick default/built-in
                 if (!cachedDevices.speaker && outputs.length > 0) {
                     cachedDevices.speaker = outputs.find(d => d.deviceId === 'default') || outputs[0];
                 }
 
-                // Auto-detect Bluetooth as first preference
+                // If Bluetooth detected on phone/laptop, prioritize it automatically
                 if (cachedDevices.bluetooth) {
                     currentRoute = 'bluetooth';
                 } else if (currentRoute === 'bluetooth') {
@@ -281,11 +287,10 @@
                 updateRouteUI();
                 applySinkToAllAudio();
             } catch(e) {
-                console.warn("Device refresh error:", e);
+                console.warn("Audio refresh:", e);
             }
         }
 
-        // 0ms INSTANT SWITCH HANDLER
         function cycleAudioRoute() {
             if (cachedDevices.bluetooth) {
                 if (currentRoute === 'bluetooth') currentRoute = 'speaker';
@@ -296,10 +301,7 @@
                 else currentRoute = 'speaker';
             }
 
-            // Immediate UI update (0 delay)
             updateRouteUI();
-            
-            // Asynchronous parallel hardware switch
             applySinkToAllAudio();
         }
 
@@ -339,15 +341,13 @@
             if (currentRoute === 'speaker' && cachedDevices.speaker) {
                 return cachedDevices.speaker.deviceId;
             }
-            return ""; // System default fallback
+            return "";
         }
 
-        // Parallel non-blocking sink application
         function applySinkToAllAudio() {
             const targetId = getTargetDeviceId();
             const audios = document.querySelectorAll('#remote-audio-container audio');
-            
-            // Promise.all prevents sequential lag
+
             Promise.all(Array.from(audios).map(audioEl => {
                 if (audioEl.setSinkId) {
                     return audioEl.setSinkId(targetId).catch(() => {
@@ -358,7 +358,6 @@
             })).catch(() => {});
         }
 
-        // Hardware connect/disconnect auto listener
         if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
             navigator.mediaDevices.addEventListener('devicechange', () => {
                 refreshAudioDevices();
@@ -413,7 +412,6 @@
 
                         document.getElementById('remote-audio-container').appendChild(audioEl);
                         
-                        // Apply active routing immediately to newly attached track
                         const targetId = getTargetDeviceId();
                         if (audioEl.setSinkId && targetId) {
                             audioEl.setSinkId(targetId).catch(() => {});
@@ -439,7 +437,13 @@
                             if (msg.targetId === myId) {
                                 if (msg.state.is_muted) {
                                     amIHardLocked = true;
-                                    if (localAudioTrack) await localAudioTrack.mute();
+                                    // Hardware leak-proof cutoff
+                                    if (localAudioTrack) {
+                                        await localAudioTrack.mute();
+                                        if (localAudioTrack.mediaStreamTrack) {
+                                            localAudioTrack.mediaStreamTrack.enabled = false;
+                                        }
+                                    }
                                     isMuted = true;
                                     isSpeakingNow = false;
                                     updateMicUI();
@@ -460,8 +464,6 @@
                 });
 
                 await room.connect(data.livekit_url, data.token);
-                
-                // Initialize background hardware routing
                 refreshAudioDevices();
 
                 document.getElementById('connection-state').innerText = "Connected";
@@ -474,6 +476,7 @@
             }
         }
 
+        // LEAK-PROOF HARDWARE MUTE / UNMUTE
         async function toggleMic() {
             if (!room) return;
             if (amIHardLocked) {
@@ -491,21 +494,33 @@
                     });
                     await room.localParticipant.publishTrack(localAudioTrack);
                     isMuted = false;
+                    
+                    if (localAudioTrack.mediaStreamTrack) {
+                        localAudioTrack.mediaStreamTrack.enabled = true;
+                    }
                     updateMicUI();
                     
-                    // Re-scan devices once mic authorization unlocks accurate hardware labels
-                    refreshAudioDevices();
+                    // Unlocking hardware labels to detect Bluetooth on phone
+                    await refreshAudioDevices();
                     return;
                 } catch (err) {
-                    showAppDialog("Microphone permission denied. Please allow mic access in browser/app settings.");
+                    showAppDialog("Microphone permission denied. Please allow mic access.");
                     return;
                 }
             }
 
             if (isMuted) {
+                // UNMUTE: Hardware & Software both open
+                if (localAudioTrack.mediaStreamTrack) {
+                    localAudioTrack.mediaStreamTrack.enabled = true;
+                }
                 await localAudioTrack.unmute();
                 isMuted = false;
             } else {
+                // MUTE: DUAL KILL - LiveKit mute + Raw Hardware Track Disable (0% leak)
+                if (localAudioTrack.mediaStreamTrack) {
+                    localAudioTrack.mediaStreamTrack.enabled = false;
+                }
                 await localAudioTrack.mute();
                 isMuted = true;
                 isSpeakingNow = false;
@@ -531,7 +546,7 @@
                 btn.classList.remove('mic-speaking-glow');
             } else {
                 btn.className = "w-16 h-16 rounded-full bg-gradient-to-tr from-emerald-500 to-emerald-400 text-white flex items-center justify-center shadow-lg shadow-emerald-500/35 active:scale-95 transition relative border-2 border-white/40 dark:border-white/20";
-                icon.innerHTML = `<path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>`;
+                icon.innerHTML = `<path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>`;
                 label.innerText = "You're Live";
 
                 if (isSpeakingNow) {
@@ -779,6 +794,9 @@
         async function leaveSpace() {
             if (localAudioTrack) {
                 try {
+                    if (localAudioTrack.mediaStreamTrack) {
+                        localAudioTrack.mediaStreamTrack.enabled = false;
+                    }
                     await localAudioTrack.mute();
                 } catch(e) {}
             }
