@@ -1,98 +1,170 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en" id="html-root" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
     <title>Voice Space</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/livekit-client@2.5.9/dist/livekit-client.umd.min.js"></script>
-    <style>
-        body {
-            background: #090d16;
-            color: #f8fafc;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    <script>
+        tailwind.config = {
+            darkMode: 'class'
         }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/livekit-client@2.5.9/dist/livekit-client.umd.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Plus Jakarta Sans', -apple-system, sans-serif; transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease; }
+        
+        /* Dark Theme Background */
+        html.dark body {
+            background: radial-gradient(circle at 50% 8%, #1e1b4b 0%, #0b0f19 50%, #05070d 100%);
+            color: #f8fafc;
+        }
+        /* Light Theme Background */
+        html.light body {
+            background: radial-gradient(circle at 50% 8%, #e0e7ff 0%, #f1f5f9 50%, #e2e8f0 100%);
+            color: #0f172a;
+        }
+
         .speaking {
             border-color: #38bdf8 !important;
-            box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.4), 0 0 20px rgba(56, 189, 248, 0.6) !important;
+            box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.4), 0 0 22px rgba(56, 189, 248, 0.5) !important;
+            animation: pulse-ring 1.5s infinite ease-in-out;
         }
-        .glass-panel {
-            background: rgba(30, 41, 59, 0.7);
+        @keyframes pulse-ring {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.04); }
+        }
+
+        /* Glassmorphism Dynamic */
+        html.dark .glass-panel {
+            background: rgba(22, 30, 49, 0.65);
             backdrop-filter: blur(16px);
             -webkit-backdrop-filter: blur(16px);
             border: 1px solid rgba(255, 255, 255, 0.08);
         }
-        .glass-pill {
+        html.light .glass-panel {
+            background: rgba(255, 255, 255, 0.75);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+        }
+
+        html.dark .glass-pill {
             background: rgba(255, 255, 255, 0.06);
             backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        html.light .glass-pill {
+            background: rgba(0, 0, 0, 0.04);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(0, 0, 0, 0.06);
+        }
+
+        .chat-bubble-enter {
+            animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(12px) scale(0.96); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .chat-bubble-exit {
+            animation: fadeOut 0.4s ease-out forwards;
+        }
+        @keyframes fadeOut {
+            from { opacity: 1; transform: scale(1); }
+            to { opacity: 0; transform: scale(0.92); height: 0; margin: 0; padding: 0; }
         }
     </style>
 </head>
 <body class="h-screen flex flex-col justify-between p-4 select-none relative overflow-hidden">
 
-    <!-- Top Status Bar -->
+    <!-- Ambient Subtle Glows -->
+    <div class="absolute -top-24 -left-20 w-64 h-64 bg-indigo-500/15 rounded-full blur-3xl pointer-events-none"></div>
+    <div class="absolute top-1/2 -right-24 w-72 h-72 bg-pink-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+    <!-- Top Status Header with Dark/Light Toggle -->
     <header class="glass-panel p-3.5 rounded-2xl flex items-center justify-between shadow-xl relative z-10">
         <div class="flex items-center gap-3 overflow-hidden">
-            <span id="status-dot" class="w-3 h-3 rounded-full bg-amber-400 shrink-0 animate-pulse"></span>
+            <span id="status-dot" class="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0 animate-pulse"></span>
             <div class="flex flex-col truncate">
-                <span class="text-sm font-bold text-white truncate" id="group-title">Loading...</span>
-                <span class="text-[10px] text-slate-400" id="connection-state">Connecting...</span>
+                <span class="text-sm font-bold truncate dark:text-white text-slate-900" id="group-title">Connecting...</span>
+                <span class="text-[10px] dark:text-slate-400 text-slate-500" id="connection-state">Connecting to space...</span>
             </div>
         </div>
         
         <div class="flex items-center gap-2">
-            <div class="glass-pill px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-200">
+            <!-- Online Counter -->
+            <div class="glass-pill px-3 py-1.5 rounded-xl text-xs font-semibold dark:text-slate-300 text-slate-700 flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
                 <span id="participant-count">0</span> Online
             </div>
-            <button onclick="toggleChat()" class="glass-pill p-2 rounded-xl text-slate-200 hover:text-white transition active:scale-95 relative">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
-                <span id="chat-badge" class="hidden absolute -top-1 -right-1 w-2 h-2 bg-pink-500 rounded-full"></span>
+
+            <!-- Dark / Light Mode Toggle Button -->
+            <button onclick="toggleTheme()" class="glass-pill p-2 rounded-xl dark:text-amber-300 text-slate-700 hover:scale-105 active:scale-95 transition" title="Toggle Theme">
+                <!-- Sun Icon (Shown in Dark Mode) -->
+                <svg id="theme-icon-sun" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                </svg>
+                <!-- Moon Icon (Shown in Light Mode) -->
+                <svg id="theme-icon-moon" class="w-4 h-4 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                </svg>
             </button>
         </div>
     </header>
 
-    <!-- Participant Grid -->
-    <main class="flex-1 flex flex-col items-center justify-center py-4 relative z-10 overflow-hidden">
-        <div id="grid" class="w-full h-full max-h-[65vh] grid grid-cols-3 gap-4 auto-rows-max overflow-y-auto p-2 items-center justify-center"></div>
+    <!-- Center Stage: Participant Grid -->
+    <main class="flex-1 flex flex-col items-center justify-start pt-6 relative z-10 overflow-hidden">
+        <div id="grid" class="w-full h-full max-h-[46vh] grid grid-cols-3 gap-y-6 gap-x-4 auto-rows-max overflow-y-auto px-2 items-start justify-center"></div>
     </main>
 
-    <!-- Error Banner -->
-    <div id="error-banner" class="hidden glass-pill bg-rose-500/20 border-rose-500/40 text-rose-300 text-xs px-4 py-2 rounded-xl text-center mb-2 relative z-10 mx-auto max-w-xs"></div>
+    <!-- Floating Live Messages Layer (Auto-disappears in 45s, Max 10 messages) -->
+    <div id="live-chat-overlay" class="absolute bottom-24 left-4 right-4 z-20 flex flex-col justify-end space-y-2 pointer-events-none max-h-48 overflow-hidden"></div>
 
-    <!-- Bottom Controls -->
-    <footer class="glass-panel px-6 py-3 rounded-full max-w-xs mx-auto w-full flex items-center justify-between shadow-2xl relative z-10 mb-2">
-        <!-- Leave -->
-        <button onclick="leaveSpace()" class="w-11 h-11 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-400 flex items-center justify-center active:scale-90 transition">
+    <!-- Inline Quick Chat Input Bar -->
+    <div id="chat-input-bar" class="hidden absolute bottom-24 left-4 right-4 z-30 pointer-events-auto">
+        <form onsubmit="handleSendChat(event)" class="glass-panel p-2 rounded-2xl flex gap-2 shadow-2xl">
+            <input id="chat-input" type="text" placeholder="Type a message into voice chat..." autocomplete="off" class="flex-1 px-4 py-2.5 rounded-xl dark:bg-slate-900/80 bg-white/90 border dark:border-white/10 border-slate-300 dark:text-white text-slate-900 text-xs outline-none focus:border-indigo-500 transition">
+            <button type="submit" class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold transition active:scale-95">Send</button>
+            <button type="button" onclick="toggleChatInput()" class="p-2 dark:text-slate-400 text-slate-600 hover:opacity-80 rounded-xl">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </form>
+    </div>
+
+    <!-- Error Banner -->
+    <div id="error-banner" class="hidden glass-pill bg-rose-500/20 border-rose-500/40 text-rose-500 dark:text-rose-300 text-xs px-4 py-2 rounded-xl text-center mb-2 relative z-10 mx-auto max-w-xs shadow-lg"></div>
+
+    <!-- Bottom Dock Controls (Leave | Mic | Chat | Speaker) -->
+    <footer class="glass-panel px-5 py-3 rounded-full max-w-sm mx-auto w-full flex items-center justify-between shadow-2xl relative z-10 mb-2">
+        <!-- 1. Leave Button -->
+        <button onclick="leaveSpace()" class="w-11 h-11 rounded-full bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/25 text-rose-500 flex items-center justify-center active:scale-90 transition">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 8l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M5 3a2 2 0 00-2 2v1c0 8.284 6.716 15 15 15h1a2 2 0 002-2v-3.28a1 1 0 00-.684-.948l-4.493-1.498a1 1 0 00-1.21.502l-1.13 2.257a11.042 11.042 0 01-5.516-5.517l2.257-1.128a1 1 0 00.502-1.21L9.228 3.683A1 1 0 008.279 3H5z"/></svg>
         </button>
 
-        <!-- Mic Toggle (Tap to Speak - Requests permission ONCE) -->
-        <button id="mic-btn" onclick="toggleMic()" class="w-14 h-14 rounded-full bg-rose-600 text-white flex items-center justify-center shadow-lg active:scale-95 transition">
-            <svg id="mic-icon" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 02-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/></svg>
+        <!-- 2. Center Mic Button -->
+        <button id="mic-btn" onclick="toggleMic()" class="w-14 h-14 rounded-full bg-rose-600 text-white flex items-center justify-center shadow-lg active:scale-95 transition border-2 border-white/20">
+            <svg id="mic-icon" class="w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 02-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/>
+            </svg>
         </button>
 
-        <!-- Speaker Toggle -->
-        <button id="spk-btn" onclick="toggleSpeaker()" class="w-11 h-11 rounded-full bg-slate-700/50 border border-white/10 text-slate-200 flex items-center justify-center active:scale-90 transition">
-            <svg id="spk-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/></svg>
+        <!-- 3. Message Button Next to Mic -->
+        <button id="chat-btn" onclick="toggleChatInput()" class="w-11 h-11 rounded-full dark:bg-indigo-600/30 bg-indigo-500/15 hover:bg-indigo-600/40 border border-indigo-400/30 text-indigo-500 dark:text-indigo-300 flex items-center justify-center active:scale-90 transition">
+            <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+            </svg>
+        </button>
+
+        <!-- 4. Speaker Button -->
+        <button id="spk-btn" onclick="toggleSpeaker()" class="w-11 h-11 rounded-full dark:bg-slate-700/40 bg-slate-200 hover:opacity-80 border dark:border-white/10 border-slate-300 dark:text-slate-200 text-slate-700 flex items-center justify-center active:scale-90 transition">
+            <svg id="spk-icon" class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/>
+            </svg>
         </button>
     </footer>
-
-    <!-- In-Room Chat Drawer -->
-    <div id="chat-drawer" class="hidden absolute inset-0 bg-slate-950/95 backdrop-blur-xl z-50 flex flex-col p-4 transition-all">
-        <div class="flex items-center justify-between pb-3 border-b border-white/10">
-            <h3 class="font-bold text-sm text-slate-100 truncate" id="chat-group-name">Chat</h3>
-            <button onclick="toggleChat()" class="p-1 text-slate-400 hover:text-white rounded bg-white/5">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-            </button>
-        </div>
-        <div id="chat-box" class="flex-1 overflow-y-auto py-3 space-y-2 text-xs"></div>
-        <form onsubmit="handleSendChat(event)" class="flex gap-2 pt-2 border-t border-white/10">
-            <input id="chat-input" type="text" placeholder="Type a message..." autocomplete="off" class="flex-1 px-3 py-2 rounded-xl bg-slate-800 border border-white/10 text-white text-xs outline-none">
-            <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold">Send</button>
-        </form>
-    </div>
 
     <script>
         const tg = window.Telegram?.WebApp;
@@ -101,10 +173,45 @@
             tg.expand();
         }
 
+        // Theme Toggle Manager
+        function initTheme() {
+            const savedTheme = localStorage.getItem('app-theme') || (tg?.colorScheme || 'dark');
+            setTheme(savedTheme);
+        }
+
+        function toggleTheme() {
+            const html = document.getElementById('html-root');
+            const newTheme = html.classList.contains('dark') ? 'light' : 'dark';
+            setTheme(newTheme);
+            localStorage.setItem('app-theme', newTheme);
+        }
+
+        function setTheme(theme) {
+            const html = document.getElementById('html-root');
+            const sunIcon = document.getElementById('theme-icon-sun');
+            const moonIcon = document.getElementById('theme-icon-moon');
+
+            if (theme === 'light') {
+                html.classList.remove('dark');
+                html.classList.add('light');
+                sunIcon.classList.add('hidden');
+                moonIcon.classList.remove('hidden');
+            } else {
+                html.classList.remove('light');
+                html.classList.add('dark');
+                sunIcon.classList.remove('hidden');
+                moonIcon.classList.add('hidden');
+            }
+        }
+
+        initTheme();
+
         let room = null;
-        let isMuted = true; // Start muted to eliminate initial prompt popup
+        let isMuted = true;
         let isSpeakerOn = true;
-        let isChatOpen = false;
+
+        const MAX_FLOATING_MESSAGES = 10;
+        const MESSAGE_LIFETIME_MS = 45000;
 
         const urlParams = new URLSearchParams(window.location.search);
         let rawId = tg?.initDataUnsafe?.start_param || urlParams.get('tgWebAppStartParam') || urlParams.get('chat_id') || "";
@@ -113,8 +220,8 @@
             const el = document.getElementById('error-banner');
             el.innerText = msg;
             el.classList.remove('hidden');
-            document.getElementById('connection-state').innerText = "Failed";
-            document.getElementById('status-dot').className = "w-3 h-3 rounded-full bg-rose-500 shrink-0";
+            document.getElementById('connection-state').innerText = "Notice";
+            document.getElementById('status-dot').className = "w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0";
         }
 
         function getLiveKit() {
@@ -123,11 +230,11 @@
 
         async function startVoiceSession() {
             if (!rawId) {
-                return showError("Missing session parameter. Launch via group link.");
+                return showError("Session parameter missing. Please launch via group link.");
             }
 
             const LK = getLiveKit();
-            if (!LK) return showError("Library loading failed. Please reopen.");
+            if (!LK) return showError("Audio library loading. Please reopen.");
 
             try {
                 document.getElementById('connection-state').innerText = "Authenticating...";
@@ -147,11 +254,7 @@
                 }
 
                 const data = await res.json();
-                
-                // Set accurate group title everywhere
-                const groupTitle = data.group_title || "Voice Space";
-                document.getElementById('group-title').innerText = groupTitle;
-                document.getElementById('chat-group-name').innerText = groupTitle;
+                document.getElementById('group-title').innerText = data.group_title || "Voice Space";
                 document.getElementById('connection-state').innerText = "Connecting...";
 
                 room = new LK.Room({
@@ -174,15 +277,14 @@
                 room.on(LK.RoomEvent.DataReceived, (payload) => {
                     try {
                         const msgObj = JSON.parse(new TextDecoder().decode(payload));
-                        appendChatMessage(msgObj.name, msgObj.text, false);
+                        displayFloatingMessage(msgObj.name, msgObj.text, false);
                     } catch(e) {}
                 });
 
-                // Connect to SFU
                 await room.connect(data.livekit_url, data.token);
 
                 document.getElementById('connection-state').innerText = "Connected";
-                document.getElementById('status-dot').className = "w-3 h-3 rounded-full bg-emerald-400 shrink-0";
+                document.getElementById('status-dot').className = "w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0";
 
                 updateMicUI();
                 renderUsers();
@@ -205,28 +307,28 @@
                 try { meta = JSON.parse(p.metadata || "{}"); } catch(e) {}
 
                 const card = document.createElement('div');
-                card.className = "flex flex-col items-center gap-1.5";
+                card.className = "flex flex-col items-center gap-1.5 transition-all";
 
                 const bubble = document.createElement('div');
                 bubble.id = `user-${p.identity}`;
-                bubble.className = `relative w-16 h-16 rounded-full border-2 ${meta.is_owner ? 'border-amber-400' : 'border-white/10'} flex items-center justify-center bg-slate-800 overflow-hidden`;
+                bubble.className = `relative w-16 h-16 rounded-full border-2 ${meta.is_owner ? 'border-amber-400 shadow-amber-400/20 shadow-md' : 'dark:border-white/10 border-slate-300'} flex items-center justify-center dark:bg-slate-800 bg-white overflow-hidden shadow-lg transition-all`;
 
                 if (meta.photo_url) {
                     bubble.innerHTML = `<img src="${meta.photo_url}" class="w-full h-full object-cover">`;
                 } else {
                     const initials = (p.name || "U").slice(0, 1).toUpperCase();
-                    bubble.innerHTML = `<span class="font-bold text-base text-indigo-400">${initials}</span>`;
+                    bubble.innerHTML = `<span class="font-bold text-base bg-gradient-to-tr from-pink-400 to-indigo-500 bg-clip-text text-transparent">${initials}</span>`;
                 }
 
                 if (meta.is_owner) {
                     const badge = document.createElement('span');
-                    badge.className = "absolute top-0 right-0 text-[10px] bg-amber-400 text-slate-900 rounded-full px-1";
+                    badge.className = "absolute top-0 right-0 text-[10px] bg-amber-400 text-slate-900 rounded-full px-1 font-bold";
                     badge.innerText = "★";
                     bubble.appendChild(badge);
                 }
 
                 const label = document.createElement('span');
-                label.className = "text-[11px] text-slate-300 font-medium truncate max-w-[75px] text-center";
+                label.className = "text-[11px] dark:text-slate-300 text-slate-700 font-semibold truncate max-w-[75px] text-center";
                 label.innerText = p.name || `User ${p.identity}`;
 
                 card.appendChild(bubble);
@@ -243,7 +345,6 @@
             });
         }
 
-        // Single explicit user-gesture trigger for microphone
         async function toggleMic() {
             if (!room) return;
             try {
@@ -258,9 +359,14 @@
 
         function updateMicUI() {
             const btn = document.getElementById('mic-btn');
-            btn.className = isMuted 
-                ? "w-14 h-14 rounded-full bg-rose-600 text-white flex items-center justify-center shadow-lg active:scale-95 transition"
-                : "w-14 h-14 rounded-full bg-indigo-600 text-white flex items-center justify-center shadow-lg active:scale-95 transition";
+            const icon = document.getElementById('mic-icon');
+            if (isMuted) {
+                btn.className = "w-14 h-14 rounded-full bg-rose-600 text-white flex items-center justify-center shadow-lg active:scale-95 transition border-2 border-white/20";
+                icon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 02-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/><line x1="1" y1="1" x2="23" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>`;
+            } else {
+                btn.className = "w-14 h-14 rounded-full bg-gradient-to-tr from-pink-500 via-purple-500 to-indigo-500 text-white flex items-center justify-center shadow-lg shadow-purple-500/40 active:scale-95 transition border-2 border-white/20";
+                icon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 02-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/>`;
+            }
         }
 
         function toggleSpeaker() {
@@ -273,63 +379,4 @@
             });
             const btn = document.getElementById('spk-btn');
             btn.className = isSpeakerOn 
-                ? "w-11 h-11 rounded-full bg-slate-700/50 border border-white/10 text-slate-200 flex items-center justify-center active:scale-90 transition" 
-                : "w-11 h-11 rounded-full bg-slate-800 text-slate-500 flex items-center justify-center active:scale-90 transition";
-        }
-
-        function toggleChat() {
-            isChatOpen = !isChatOpen;
-            const drawer = document.getElementById('chat-drawer');
-            const badge = document.getElementById('chat-badge');
-            if (isChatOpen) {
-                drawer.classList.remove('hidden');
-                badge.classList.add('hidden');
-                document.getElementById('chat-input').focus();
-            } else {
-                drawer.classList.add('hidden');
-            }
-        }
-
-        function handleSendChat(e) {
-            e.preventDefault();
-            const input = document.getElementById('chat-input');
-            const msg = input.value.trim();
-            if (!msg || !room) return;
-
-            const myName = room.localParticipant.name || "Me";
-            const payload = JSON.stringify({ name: myName, text: msg });
-            room.localParticipant.publishData(new TextEncoder().encode(payload), { reliable: true });
-
-            appendChatMessage(myName, msg, true);
-            input.value = "";
-        }
-
-        function appendChatMessage(name, text, isMe) {
-            const box = document.getElementById('chat-box');
-            const div = document.createElement('div');
-            div.className = `p-2.5 rounded-xl max-w-[85%] ${isMe ? 'ml-auto bg-indigo-600 text-white' : 'bg-slate-800 text-slate-200'}`;
-            div.innerHTML = `<span class="block text-[10px] opacity-70 mb-0.5">${name}</span><p class="break-words">${text}</p>`;
-            box.appendChild(div);
-            box.scrollTop = box.scrollHeight;
-            if (!isChatOpen && !isMe) document.getElementById('chat-badge').classList.remove('hidden');
-        }
-
-        async function leaveSpace() {
-            if (room) await room.disconnect();
-            if (tg && tg.close) tg.close();
-            else window.close();
-        }
-
-        window.addEventListener('DOMContentLoaded', () => {
-            let attempts = 0;
-            const timer = setInterval(() => {
-                attempts++;
-                if (getLiveKit() || attempts > 30) {
-                    clearInterval(timer);
-                    startVoiceSession();
-                }
-            }, 100);
-        });
-    </script>
-</body>
-</html>
+            
