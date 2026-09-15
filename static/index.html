@@ -22,14 +22,32 @@
         html.dark .glass-pill { background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.08); }
         html.light .glass-pill { background: rgba(0, 0, 0, 0.04); border: 1px solid rgba(0, 0, 0, 0.06); }
 
+        /* Telegram Native Floating Chat Pill */
         .tg-chat-bubble {
-            animation: slideUpPill 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            animation: slideUpPill 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
             background: rgba(23, 30, 42, 0.92);
             backdrop-filter: blur(14px);
             border: 1px solid rgba(255, 255, 255, 0.09);
             box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
         }
-        @keyframes slideUpPill { from { opacity: 0; transform: translateY(10px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        @keyframes slideUpPill { 
+            from { opacity: 0; transform: translateY(12px) scale(0.92); } 
+            to { opacity: 1; transform: translateY(0) scale(1); } 
+        }
+
+        /* Animated Emoji inside Chat Message */
+        .animated-chat-emoji {
+            display: inline-block;
+            font-size: 20px;
+            line-height: 1;
+            transform-origin: center bottom;
+            animation: emojiBounce 1.2s cubic-bezier(0.28, 0.84, 0.42, 1) infinite alternate;
+        }
+        @keyframes emojiBounce {
+            0% { transform: scale(0.9) translateY(0); }
+            50% { transform: scale(1.35) translateY(-4px) rotate(-6deg); }
+            100% { transform: scale(1.15) translateY(-1px) rotate(6deg); }
+        }
 
         .aesthetic-dock {
             backdrop-filter: blur(20px);
@@ -70,36 +88,6 @@
         .reaction-bar-scroll::-webkit-scrollbar {
             display: none;
         }
-
-        /* Floating Reaction Physics */
-        .floating-reaction {
-            position: absolute;
-            bottom: 25px;
-            font-size: 28px;
-            pointer-events: none;
-            z-index: 50;
-            will-change: transform, opacity;
-            animation: floatUpAndFade 1.8s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
-        }
-
-        @keyframes floatUpAndFade {
-            0% {
-                opacity: 0;
-                transform: translateY(0) scale(0.4) rotate(0deg);
-            }
-            15% {
-                opacity: 1;
-                transform: translateY(-20px) scale(1.4) rotate(-6deg);
-            }
-            60% {
-                opacity: 0.95;
-                transform: translateY(-70px) scale(1.15) rotate(6deg);
-            }
-            100% {
-                opacity: 0;
-                transform: translateY(-130px) scale(0.9) rotate(-4deg);
-            }
-        }
     </style>
 </head>
 <body class="h-screen flex flex-col justify-between p-4 select-none relative overflow-hidden" onclick="resumeAudioContext()">
@@ -127,6 +115,7 @@
         <div id="grid" class="w-full h-full max-h-[46vh] grid grid-cols-3 gap-y-6 gap-x-4 auto-rows-max overflow-y-auto px-2 items-start justify-center"></div>
     </main>
 
+    <!-- Telegram-Style Floating Messages & Animated Reactions -->
     <div id="live-chat-overlay" class="absolute bottom-36 left-4 right-4 z-20 flex flex-col items-center justify-end space-y-2 pointer-events-none max-h-44 overflow-hidden"></div>
 
     <div id="chat-input-bar" class="hidden absolute bottom-36 left-4 right-4 z-30 pointer-events-auto">
@@ -141,21 +130,21 @@
     <!-- Scrollable Live Reaction Emojis Bar (15 Reactions) -->
     <div class="w-full max-w-sm mx-auto px-2 mb-2 z-20">
         <div class="reaction-bar-scroll flex items-center gap-2 overflow-x-auto py-1.5 px-3 glass-panel rounded-full shadow-lg border border-white/10">
-            <button onclick="sendReaction('❤️')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">❤️</button>
-            <button onclick="sendReaction('🔥')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">🔥</button>
-            <button onclick="sendReaction('👏')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">👏</button>
-            <button onclick="sendReaction('😂')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">😂</button>
-            <button onclick="sendReaction('🚀')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">🚀</button>
-            <button onclick="sendReaction('🎉')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">🎉</button>
-            <button onclick="sendReaction('😍')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">😍</button>
-            <button onclick="sendReaction('💯')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">💯</button>
-            <button onclick="sendReaction('⚡')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">⚡</button>
-            <button onclick="sendReaction('😎')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">😎</button>
-            <button onclick="sendReaction('🥳')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">🥳</button>
-            <button onclick="sendReaction('🤯')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">🤯</button>
-            <button onclick="sendReaction('✨')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">✨</button>
-            <button onclick="sendReaction('👍')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">👍</button>
-            <button onclick="sendReaction('🫡')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">🫡</button>
+            <button onclick="sendEmojiReaction('❤️')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">❤️</button>
+            <button onclick="sendEmojiReaction('🔥')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">🔥</button>
+            <button onclick="sendEmojiReaction('👏')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">👏</button>
+            <button onclick="sendEmojiReaction('😂')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">😂</button>
+            <button onclick="sendEmojiReaction('🚀')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">🚀</button>
+            <button onclick="sendEmojiReaction('🎉')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">🎉</button>
+            <button onclick="sendEmojiReaction('😍')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">😍</button>
+            <button onclick="sendEmojiReaction('💯')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">💯</button>
+            <button onclick="sendEmojiReaction('⚡')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">⚡</button>
+            <button onclick="sendEmojiReaction('😎')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">😎</button>
+            <button onclick="sendEmojiReaction('🥳')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">🥳</button>
+            <button onclick="sendEmojiReaction('🤯')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">🤯</button>
+            <button onclick="sendEmojiReaction('✨')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">✨</button>
+            <button onclick="sendEmojiReaction('👍')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">👍</button>
+            <button onclick="sendEmojiReaction('🫡')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">🫡</button>
         </div>
     </div>
 
@@ -316,45 +305,29 @@
 
         function getLiveKit() { return window.LivekitClient || window.livekit || window.LiveKit; }
 
-        // LIVE REACTION FUNCTIONS
-        function sendReaction(emoji) {
+        // EMOJI SENT AS CHAT MESSAGE WITH ANIMATION
+        function sendEmojiReaction(emoji) {
             if (!room || !room.localParticipant) return;
-            const myId = String(room.localParticipant.identity);
+            const myName = room.localParticipant.name || "Me";
 
-            triggerAvatarEmoji(myId, emoji);
-
+            // Broadcast emoji as animated chat reaction
             const payload = JSON.stringify({
-                type: "LIVE_REACTION",
-                senderId: myId,
+                type: "CHAT_REACTION",
+                name: myName,
+                photo_url: myPhotoUrl,
                 emoji: emoji
             });
 
             try {
                 room.localParticipant.publishData(new TextEncoder().encode(payload), {
-                    reliable: false
+                    reliable: true
                 });
             } catch (e) {
                 console.warn("Reaction publish error:", e);
             }
-        }
 
-        function triggerAvatarEmoji(userId, emoji) {
-            const avatarBubble = document.getElementById(`user-${userId}`);
-            if (!avatarBubble) return;
-
-            const el = document.createElement("div");
-            el.className = "floating-reaction";
-            el.innerText = emoji;
-
-            const randomOffset = Math.floor(Math.random() * 24) - 12;
-            el.style.left = `calc(50% + ${randomOffset}px - 14px)`;
-
-            avatarBubble.parentElement.style.position = "relative";
-            avatarBubble.parentElement.appendChild(el);
-
-            setTimeout(() => {
-                if (el.parentNode) el.parentNode.removeChild(el);
-            }, 1800);
+            // Local screen par instantly show karo
+            displayFloatingReactionMessage(myName, myPhotoUrl, emoji);
         }
 
         async function refreshAudioDevices() {
@@ -545,10 +518,8 @@
                         const msg = JSON.parse(new TextDecoder().decode(payload));
                         const myId = String(room.localParticipant.identity);
 
-                        if (msg.type === "LIVE_REACTION") {
-                            if (msg.senderId !== myId) {
-                                triggerAvatarEmoji(msg.senderId, msg.emoji);
-                            }
+                        if (msg.type === "CHAT_REACTION") {
+                            displayFloatingReactionMessage(msg.name, msg.photo_url, msg.emoji);
                         } else if (msg.type === "MOD_STATE_CHANGE") {
                             participantStates[msg.targetId] = msg.state;
                             renderUsers();
@@ -660,7 +631,7 @@
                 btn.classList.remove('mic-speaking-glow');
             } else {
                 btn.className = "w-16 h-16 rounded-full bg-gradient-to-tr from-emerald-500 to-emerald-400 text-white flex items-center justify-center shadow-lg shadow-emerald-500/35 active:scale-95 transition relative border-2 border-white/40 dark:border-white/20";
-                icon.innerHTML = `<path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>`;
+                icon.innerHTML = `<path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>`;
                 label.innerText = "You're Live";
 
                 if (isSpeakingNow) {
@@ -881,6 +852,7 @@
             toggleChatInput();
         }
 
+        // STANDARD CHAT MESSAGE PILL
         function displayFloatingMessage(name, photoUrl, text) {
             const overlay = document.getElementById('live-chat-overlay');
             const item = document.createElement('div');
@@ -903,6 +875,31 @@
 
             overlay.appendChild(item);
             setTimeout(() => { if (item.parentNode === overlay) overlay.removeChild(item); }, 15000);
+        }
+
+        // FLOATING EMOJI REACTION AS ANIMATED CHAT PILL
+        function displayFloatingReactionMessage(name, photoUrl, emoji) {
+            const overlay = document.getElementById('live-chat-overlay');
+            const item = document.createElement('div');
+            item.className = "tg-chat-bubble px-3.5 py-1.5 rounded-full text-xs flex items-center gap-2 max-w-[90%] text-white pointer-events-auto border border-white/15 shadow-2xl";
+            
+            let avatarHtml = '';
+            if (photoUrl) {
+                avatarHtml = `<img src="${photoUrl}" class="w-5 h-5 rounded-full object-cover shrink-0 border border-white/20">`;
+            } else {
+                avatarHtml = `<div class="w-5 h-5 rounded-full bg-slate-700 text-white flex items-center justify-center text-[10px] font-bold shrink-0 border border-white/20">${(name || "U")[0].toUpperCase()}</div>`;
+            }
+
+            item.innerHTML = `
+                ${avatarHtml}
+                <div class="flex items-center gap-2 overflow-hidden">
+                    <span class="font-bold text-[11px] text-sky-400 shrink-0 truncate max-w-[110px]">${name}:</span>
+                    <span class="animated-chat-emoji">${emoji}</span>
+                </div>
+            `;
+
+            overlay.appendChild(item);
+            setTimeout(() => { if (item.parentNode === overlay) overlay.removeChild(item); }, 8000);
         }
 
         async function leaveSpace() {
