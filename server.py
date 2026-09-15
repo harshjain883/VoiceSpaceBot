@@ -56,7 +56,7 @@ class ModerateRequest(BaseModel):
     chat_id: str
     init_data: str
     target_user_id: int
-    action: str  # "mute", "unmute", or "kick"
+    action: str  # "mute", "unmute", ya "kick"
 
 
 def verify_telegram_init_data(init_data: str, bot_token: str):
@@ -199,7 +199,8 @@ async def end_room(req: EndRoomRequest):
 
     lk_api = api.LiveKitAPI(LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET)
     try:
-        room_name = f"room_{normalized_chat_id}"
+        stored_cid = room_data.get("chat_id") if room_data else normalized_chat_id
+        room_name = f"room_{stored_cid}"
         await lk_api.room.delete_room(api.DeleteRoomRequest(room=room_name))
         await delete_room(normalized_chat_id)
         await delete_room(raw_chat)
@@ -218,9 +219,8 @@ async def moderate_user(req: ModerateRequest):
         raise HTTPException(status_code=401, detail="Unauthorized")
 
     caller_id = user_data.get("id")
-    raw_chat = req.chat_id.replace("vc_", "").replace("room_", "")
-    if "x" in raw_chat:
-        raw_chat = raw_chat.split("x")[0]
+    incoming_param = req.chat_id.replace("vc_", "").replace("room_", "")
+    raw_chat = incoming_param.split("x")[0] if "x" in incoming_param else incoming_param
 
     normalized_chat_id = raw_chat if raw_chat.startswith("-") else (
         raw_chat if raw_chat.startswith("-100") else f"-100{raw_chat}"
@@ -229,60 +229,62 @@ async def moderate_user(req: ModerateRequest):
     room_data = await get_room(normalized_chat_id)
     if not room_data:
         room_data = await get_room(raw_chat)
+    if not room_data:
+        room_data = await rooms_collection.find_one({"active_session": incoming_param})
 
-    admins = room_data.get("admins", []) if room_data else []
+    if not room_data:
+        raise HTTPException(status_code=404, detail="Voice Space not found")
+
+    admins = room_data.get("admins", [])
     caller_is_owner = caller_id in OWNER_IDS
     caller_is_admin = caller_id in admins
 
     if not caller_is_owner and not caller_is_admin:
         raise HTTPException(status_code=403, detail="Permission Denied")
 
-    # Bot Owner immunity
     if req.target_user_id in OWNER_IDS:
         raise HTTPException(status_code=403, detail="Cannot moderate Bot Owner")
 
-    # Admin cannot moderate other admins
     target_is_admin = req.target_user_id in admins
     if not caller_is_owner and target_is_admin:
         raise HTTPException(status_code=403, detail="Group Admins can only moderate regular members")
 
+    stored_cid = room_data.get("chat_id", normalized_chat_id)
+    room_name = f"room_{stored_cid}"
+
     lk_api = api.LiveKitAPI(LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET)
-    room_name = f"room_{normalized_chat_id}"
     try:
         if req.action == "kick":
-            # Instantly remove participant from SFU Room
             await lk_api.room.remove_participant(
                 api.RoomParticipantIdentity(room=room_name, identity=str(req.target_user_id))
             )
         elif req.action == "mute":
-            # 1. Hardware Track Mute
-            await lk_api.room.mute_published_track(
-                api.MuteRoomTrackRequest(
-                    room=room_name,
-                    identity=str(req.target_user_id),
-                    track_sid="",
-                    muted=True
+            # LiveKit safe permission revocation (locks the mic)
+            try:
+                perm = api.ParticipantPermission(can_publish=False, can_subscribe=True, can_publish_data=True)
+                await lk_api.room.update_participant(
+                    api.UpdateParticipantRequest(
+                        room=room_name,
+                        identity=str(req.target_user_id),
+                        permission=perm
+                    )
                 )
-            )
-            # 2. Revoke publishing permission to lock the microphone
-            await lk_api.room.update_participant(
-                api.UpdateParticipantMetadata(
-                    room=room_name,
-                    identity=str(req.target_user_id),
-                    permission=api.ParticipantPermission(can_publish=False, can_subscribe=True, can_publish_data=True)
-                )
-            )
+            except Exception as e:
+                print("Permission lock warning:", e)
         elif req.action == "unmute":
-            # Restore publishing permission so user can toggle mic again
-            await lk_api.room.update_participant(
-                api.UpdateParticipantMetadata(
-                    room=room_name,
-                    identity=str(req.target_user_id),
-                    permission=api.ParticipantPermission(can_publish=True, can_subscribe=True, can_publish_data=True)
+            try:
+                perm = api.ParticipantPermission(can_publish=True, can_subscribe=True, can_publish_data=True)
+                await lk_api.room.update_participant(
+                    api.UpdateParticipantRequest(
+                        room=room_name,
+                        identity=str(req.target_user_id),
+                        permission=perm
+                    )
                 )
-            )
+            except Exception as e:
+                print("Permission unlock warning:", e)
     finally:
         await lk_api.aclose()
 
     return {"status": "ok"}
-    
+                                                    
