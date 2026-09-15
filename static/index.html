@@ -80,7 +80,6 @@
             box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.4), 0 0 20px rgba(34, 197, 94, 0.6) !important;
         }
 
-        /* Scrollable Emoji Bar */
         .reaction-bar-scroll {
             scrollbar-width: none;
             -ms-overflow-style: none;
@@ -90,7 +89,7 @@
         }
     </style>
 </head>
-<body class="h-screen flex flex-col justify-between p-4 select-none relative overflow-hidden" onclick="resumeAudioContext()">
+<body class="h-screen flex flex-col justify-between p-4 select-none relative overflow-hidden" onclick="handleBodyClick(event)">
 
     <div id="remote-audio-container" class="hidden"></div>
 
@@ -115,43 +114,46 @@
         <div id="grid" class="w-full h-full max-h-[46vh] grid grid-cols-3 gap-y-6 gap-x-4 auto-rows-max overflow-y-auto px-2 items-start justify-center"></div>
     </main>
 
-    <!-- Telegram-Style Floating Messages & Animated Reactions -->
-    <div id="live-chat-overlay" class="absolute bottom-36 left-4 right-4 z-20 flex flex-col items-center justify-end space-y-2 pointer-events-none max-h-44 overflow-hidden"></div>
+    <!-- Floating Live Chat Messages -->
+    <div id="live-chat-overlay" class="absolute bottom-28 left-4 right-4 z-20 flex flex-col items-center justify-end space-y-2 pointer-events-none max-h-44 overflow-hidden"></div>
 
-    <div id="chat-input-bar" class="hidden absolute bottom-36 left-4 right-4 z-30 pointer-events-auto">
-        <form onsubmit="handleSendChat(event)" class="glass-panel p-2 rounded-2xl flex gap-2 shadow-2xl">
-            <input id="chat-input" type="text" placeholder="Type a message into voice chat..." autocomplete="off" class="flex-1 px-4 py-2.5 rounded-xl dark:bg-slate-900 bg-white border border-white/10 dark:text-white text-slate-900 text-xs outline-none focus:border-sky-500">
-            <button type="submit" class="px-4 py-2.5 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-semibold active:scale-95 transition">Send</button>
+    <!-- COMBINED MESSAGE & EMOJI DRAWER (Hidden by default, auto-hides on keyboard close/blur) -->
+    <div id="message-drawer" class="hidden absolute bottom-24 left-4 right-4 z-30 flex flex-col gap-2 pointer-events-auto">
+        
+        <!-- Emoji Selection Bar (Only shows when Message is open) -->
+        <div class="w-full max-w-sm mx-auto px-1">
+            <div class="reaction-bar-scroll flex items-center gap-2 overflow-x-auto py-1.5 px-3 glass-panel rounded-full shadow-lg border border-white/10">
+                <button type="button" onmousedown="preventInputBlur(event)" onclick="sendEmojiReaction('❤️')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">❤️</button>
+                <button type="button" onmousedown="preventInputBlur(event)" onclick="sendEmojiReaction('🔥')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">🔥</button>
+                <button type="button" onmousedown="preventInputBlur(event)" onclick="sendEmojiReaction('👏')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">👏</button>
+                <button type="button" onmousedown="preventInputBlur(event)" onclick="sendEmojiReaction('😂')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">😂</button>
+                <button type="button" onmousedown="preventInputBlur(event)" onclick="sendEmojiReaction('🚀')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">🚀</button>
+                <button type="button" onmousedown="preventInputBlur(event)" onclick="sendEmojiReaction('🎉')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">🎉</button>
+                <button type="button" onmousedown="preventInputBlur(event)" onclick="sendEmojiReaction('😍')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">😍</button>
+                <button type="button" onmousedown="preventInputBlur(event)" onclick="sendEmojiReaction('💯')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">💯</button>
+                <button type="button" onmousedown="preventInputBlur(event)" onclick="sendEmojiReaction('⚡')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">⚡</button>
+                <button type="button" onmousedown="preventInputBlur(event)" onclick="sendEmojiReaction('😎')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">😎</button>
+                <button type="button" onmousedown="preventInputBlur(event)" onclick="sendEmojiReaction('🥳')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">🥳</button>
+                <button type="button" onmousedown="preventInputBlur(event)" onclick="sendEmojiReaction('🤯')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">🤯</button>
+                <button type="button" onmousedown="preventInputBlur(event)" onclick="sendEmojiReaction('✨')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">✨</button>
+                <button type="button" onmousedown="preventInputBlur(event)" onclick="sendEmojiReaction('👍')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">👍</button>
+                <button type="button" onmousedown="preventInputBlur(event)" onclick="sendEmojiReaction('🫡')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">🫡</button>
+            </div>
+        </div>
+
+        <!-- Text Chat Input Form -->
+        <form id="chat-form" onsubmit="handleSendChat(event)" class="glass-panel p-2 rounded-2xl flex gap-2 shadow-2xl max-w-sm mx-auto w-full">
+            <input id="chat-input" type="text" placeholder="Type message or tap emoji..." autocomplete="off" class="flex-1 px-4 py-2.5 rounded-xl dark:bg-slate-900 bg-white border border-white/10 dark:text-white text-slate-900 text-xs outline-none focus:border-sky-500">
+            <button type="submit" onmousedown="preventInputBlur(event)" class="px-4 py-2.5 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-semibold active:scale-95 transition">Send</button>
         </form>
     </div>
 
     <div id="error-banner" class="hidden glass-pill bg-rose-500/20 text-rose-400 text-xs px-4 py-2 rounded-xl text-center mb-2 relative z-10 mx-auto max-w-xs shadow-lg"></div>
 
-    <!-- Scrollable Live Reaction Emojis Bar (15 Reactions) -->
-    <div class="w-full max-w-sm mx-auto px-2 mb-2 z-20">
-        <div class="reaction-bar-scroll flex items-center gap-2 overflow-x-auto py-1.5 px-3 glass-panel rounded-full shadow-lg border border-white/10">
-            <button onclick="sendEmojiReaction('❤️')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">❤️</button>
-            <button onclick="sendEmojiReaction('🔥')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">🔥</button>
-            <button onclick="sendEmojiReaction('👏')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">👏</button>
-            <button onclick="sendEmojiReaction('😂')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">😂</button>
-            <button onclick="sendEmojiReaction('🚀')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">🚀</button>
-            <button onclick="sendEmojiReaction('🎉')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">🎉</button>
-            <button onclick="sendEmojiReaction('😍')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">😍</button>
-            <button onclick="sendEmojiReaction('💯')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">💯</button>
-            <button onclick="sendEmojiReaction('⚡')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">⚡</button>
-            <button onclick="sendEmojiReaction('😎')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">😎</button>
-            <button onclick="sendEmojiReaction('🥳')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">🥳</button>
-            <button onclick="sendEmojiReaction('🤯')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">🤯</button>
-            <button onclick="sendEmojiReaction('✨')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">✨</button>
-            <button onclick="sendEmojiReaction('👍')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">👍</button>
-            <button onclick="sendEmojiReaction('🫡')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">🫡</button>
-        </div>
-    </div>
-
-    <!-- Dock Controls -->
+    <!-- Aesthetic Bottom Dock Controls -->
     <footer class="aesthetic-dock w-full max-w-sm mx-auto px-4 py-3 flex items-center justify-between relative z-10 mb-2">
         
-        <!-- Audio Routing Button (Speaker / Bluetooth / Earpiece) -->
+        <!-- 1. Speaker Button -->
         <div class="flex flex-col items-center gap-1.5 flex-1">
             <button id="spk-btn" onclick="cycleAudioRoute()" class="w-12 h-12 rounded-full bg-sky-500/15 dark:bg-sky-400/20 text-sky-600 dark:text-sky-400 border border-sky-500/30 flex items-center justify-center shadow-sm active:scale-90 transition">
                 <svg id="icon-speaker" class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -167,7 +169,7 @@
             <span id="output-label" class="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Speaker</span>
         </div>
 
-        <!-- Center Hero Mic -->
+        <!-- 2. Center Hero Mic Button -->
         <div class="flex flex-col items-center gap-1.5 flex-1 -mt-4">
             <button id="mic-btn" onclick="toggleMic()" class="w-16 h-16 rounded-full bg-gradient-to-tr from-sky-500 to-sky-400 text-white flex items-center justify-center shadow-lg shadow-sky-500/30 active:scale-95 transition relative border-2 border-white/40 dark:border-white/20">
                 <svg id="mic-icon" class="w-7 h-7" fill="currentColor" viewBox="0 0 24 24">
@@ -177,9 +179,9 @@
             <span id="mic-status-label" class="text-[11px] font-bold text-slate-800 dark:text-slate-200">Unmute</span>
         </div>
 
-        <!-- Message Button -->
+        <!-- 3. Message Button (Toggles both Chat and Emojis) -->
         <div class="flex flex-col items-center gap-1.5 flex-1">
-            <button onclick="toggleChatInput()" class="w-12 h-12 rounded-full bg-emerald-500/15 dark:bg-emerald-400/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center justify-center shadow-sm active:scale-90 transition">
+            <button id="msg-btn" onclick="toggleMessageDrawer(event)" class="w-12 h-12 rounded-full bg-emerald-500/15 dark:bg-emerald-400/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center justify-center shadow-sm active:scale-90 transition">
                 <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/>
                 </svg>
@@ -187,7 +189,7 @@
             <span id="msg-label" class="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Message</span>
         </div>
 
-        <!-- Leave Button -->
+        <!-- 4. Leave Button -->
         <div class="flex flex-col items-center gap-1.5 flex-1">
             <button onclick="leaveSpace()" class="w-12 h-12 rounded-full bg-rose-500/15 dark:bg-rose-400/20 text-rose-600 dark:text-rose-400 border border-rose-500/30 flex items-center justify-center shadow-sm active:scale-90 transition">
                 <svg class="w-5 h-5 rotate-135" fill="currentColor" viewBox="0 0 24 24">
@@ -199,7 +201,7 @@
 
     </footer>
 
-    <!-- Custom In-App Modal -->
+    <!-- Custom In-App Dialog -->
     <div id="custom-app-dialog" class="hidden fixed inset-0 z-50 bg-black/65 backdrop-blur-sm flex items-center justify-center p-5">
         <div class="glass-panel p-5 rounded-3xl max-w-xs w-full text-left space-y-3 shadow-2xl border border-white/10">
             <div class="flex items-center justify-between">
@@ -277,7 +279,7 @@
         let participantStates = {};
         let userVolumes = {};
 
-        let currentRoute = 'speaker'; // 'speaker' | 'bluetooth' | 'earpiece'
+        let currentRoute = 'speaker';
         let cachedDevices = { bluetooth: null, speaker: null, earpiece: null };
 
         let audioCtx = null;
@@ -305,12 +307,66 @@
 
         function getLiveKit() { return window.LivekitClient || window.livekit || window.LiveKit; }
 
-        // EMOJI SENT AS CHAT MESSAGE WITH ANIMATION
+        // ==========================================
+        // DRAWER & KEYBOARD AUTO-DISMISS CONTROLS
+        // ==========================================
+        let isDrawerOpen = false;
+
+        function toggleMessageDrawer(e) {
+            if (e) e.stopPropagation();
+            const drawer = document.getElementById('message-drawer');
+            const input = document.getElementById('chat-input');
+            
+            isDrawerOpen = !isDrawerOpen;
+            if (isDrawerOpen) {
+                drawer.classList.remove('hidden');
+                setTimeout(() => input.focus(), 50);
+            } else {
+                hideMessageDrawer();
+            }
+        }
+
+        function hideMessageDrawer() {
+            const drawer = document.getElementById('message-drawer');
+            const input = document.getElementById('chat-input');
+            drawer.classList.add('hidden');
+            input.blur();
+            isDrawerOpen = false;
+        }
+
+        function preventInputBlur(e) {
+            e.preventDefault(); // Prevents input blur when tapping emoji or send button
+        }
+
+        function handleBodyClick(e) {
+            resumeAudioContext();
+            const drawer = document.getElementById('message-drawer');
+            const msgBtn = document.getElementById('msg-btn');
+
+            // Agar click drawer ke bahar hua hai to drawer band kar do
+            if (isDrawerOpen && !drawer.contains(e.target) && !msgBtn.contains(e.target)) {
+                hideMessageDrawer();
+            }
+        }
+
+        // Keyboard band hone par (Android/iOS blur) auto-hide
+        document.addEventListener('DOMContentLoaded', () => {
+            const input = document.getElementById('chat-input');
+            input.addEventListener('blur', () => {
+                // Short timeout to allow button clicks inside drawer
+                setTimeout(() => {
+                    if (document.activeElement !== input) {
+                        hideMessageDrawer();
+                    }
+                }, 200);
+            });
+        });
+
+        // EMOJI REACTION SENDER
         function sendEmojiReaction(emoji) {
             if (!room || !room.localParticipant) return;
             const myName = room.localParticipant.name || "Me";
 
-            // Broadcast emoji as animated chat reaction
             const payload = JSON.stringify({
                 type: "CHAT_REACTION",
                 name: myName,
@@ -323,13 +379,80 @@
                     reliable: true
                 });
             } catch (e) {
-                console.warn("Reaction publish error:", e);
+                console.warn("Reaction error:", e);
             }
 
-            // Local screen par instantly show karo
             displayFloatingReactionMessage(myName, myPhotoUrl, emoji);
+            hideMessageDrawer(); // Auto close on send
         }
 
+        // TEXT CHAT SENDER
+        function handleSendChat(e) {
+            e.preventDefault();
+            const input = document.getElementById('chat-input');
+            const msg = input.value.trim();
+            if (!msg || !room) return;
+
+            const myName = room.localParticipant.name || "Me";
+            const payload = JSON.stringify({ type: "CHAT", name: myName, photo_url: myPhotoUrl, text: msg });
+            room.localParticipant.publishData(new TextEncoder().encode(payload), { reliable: true });
+            displayFloatingMessage(myName, myPhotoUrl, msg);
+            input.value = "";
+            hideMessageDrawer(); // Auto close on send
+        }
+
+        // FLOATING REACTION MESSAGE PILL
+        function displayFloatingReactionMessage(name, photoUrl, emoji) {
+            const overlay = document.getElementById('live-chat-overlay');
+            const item = document.createElement('div');
+            item.className = "tg-chat-bubble px-3.5 py-1.5 rounded-full text-xs flex items-center gap-2 max-w-[90%] text-white pointer-events-auto border border-white/15 shadow-2xl";
+            
+            let avatarHtml = '';
+            if (photoUrl) {
+                avatarHtml = `<img src="${photoUrl}" class="w-5 h-5 rounded-full object-cover shrink-0 border border-white/20">`;
+            } else {
+                avatarHtml = `<div class="w-5 h-5 rounded-full bg-slate-700 text-white flex items-center justify-center text-[10px] font-bold shrink-0 border border-white/20">${(name || "U")[0].toUpperCase()}</div>`;
+            }
+
+            item.innerHTML = `
+                ${avatarHtml}
+                <div class="flex items-center gap-2 overflow-hidden">
+                    <span class="font-bold text-[11px] text-sky-400 shrink-0 truncate max-w-[110px]">${name}:</span>
+                    <span class="animated-chat-emoji">${emoji}</span>
+                </div>
+            `;
+
+            overlay.appendChild(item);
+            setTimeout(() => { if (item.parentNode === overlay) overlay.removeChild(item); }, 8000);
+        }
+
+        function displayFloatingMessage(name, photoUrl, text) {
+            const overlay = document.getElementById('live-chat-overlay');
+            const item = document.createElement('div');
+            item.className = "tg-chat-bubble px-3 py-1.5 rounded-full text-xs flex items-center gap-2 max-w-[90%] text-white pointer-events-auto";
+            
+            let avatarHtml = '';
+            if (photoUrl) {
+                avatarHtml = `<img src="${photoUrl}" class="w-5 h-5 rounded-full object-cover shrink-0 border border-white/20">`;
+            } else {
+                avatarHtml = `<div class="w-5 h-5 rounded-full bg-slate-700 text-white flex items-center justify-center text-[10px] font-bold shrink-0 border border-white/20">${(name || "U")[0].toUpperCase()}</div>`;
+            }
+
+            item.innerHTML = `
+                ${avatarHtml}
+                <div class="flex items-center gap-1.5 overflow-hidden">
+                    <span class="font-bold text-[11px] text-sky-400 shrink-0 truncate max-w-[110px]">${name}:</span>
+                    <span class="text-slate-200 text-[11px] truncate">${text}</span>
+                </div>
+            `;
+
+            overlay.appendChild(item);
+            setTimeout(() => { if (item.parentNode === overlay) overlay.removeChild(item); }, 15000);
+        }
+
+        // ==========================================
+        // HARDWARE AUDIO ROUTING
+        // ==========================================
         async function refreshAudioDevices() {
             if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
             try {
@@ -455,6 +578,9 @@
             });
         }
 
+        // ==========================================
+        // VOICE ROOM & LIVEKIT
+        // ==========================================
         async function startVoiceSession() {
             const urlParams = new URLSearchParams(window.location.search);
             currentChatId = tg?.initDataUnsafe?.start_param || urlParams.get('tgWebAppStartParam') || urlParams.get('chat_id') || "";
@@ -830,76 +956,6 @@
 
             isSpeakingNow = amISpeaking && !isMuted;
             updateMicUI();
-        }
-
-        function toggleChatInput() {
-            const b = document.getElementById('chat-input-bar');
-            b.classList.toggle('hidden');
-            if (!b.classList.contains('hidden')) document.getElementById('chat-input').focus();
-        }
-
-        function handleSendChat(e) {
-            e.preventDefault();
-            const input = document.getElementById('chat-input');
-            const msg = input.value.trim();
-            if (!msg || !room) return;
-
-            const myName = room.localParticipant.name || "Me";
-            const payload = JSON.stringify({ type: "CHAT", name: myName, photo_url: myPhotoUrl, text: msg });
-            room.localParticipant.publishData(new TextEncoder().encode(payload), { reliable: true });
-            displayFloatingMessage(myName, myPhotoUrl, msg);
-            input.value = "";
-            toggleChatInput();
-        }
-
-        // STANDARD CHAT MESSAGE PILL
-        function displayFloatingMessage(name, photoUrl, text) {
-            const overlay = document.getElementById('live-chat-overlay');
-            const item = document.createElement('div');
-            item.className = "tg-chat-bubble px-3 py-1.5 rounded-full text-xs flex items-center gap-2 max-w-[90%] text-white pointer-events-auto";
-            
-            let avatarHtml = '';
-            if (photoUrl) {
-                avatarHtml = `<img src="${photoUrl}" class="w-5 h-5 rounded-full object-cover shrink-0 border border-white/20">`;
-            } else {
-                avatarHtml = `<div class="w-5 h-5 rounded-full bg-slate-700 text-white flex items-center justify-center text-[10px] font-bold shrink-0 border border-white/20">${(name || "U")[0].toUpperCase()}</div>`;
-            }
-
-            item.innerHTML = `
-                ${avatarHtml}
-                <div class="flex items-center gap-1.5 overflow-hidden">
-                    <span class="font-bold text-[11px] text-sky-400 shrink-0 truncate max-w-[110px]">${name}:</span>
-                    <span class="text-slate-200 text-[11px] truncate">${text}</span>
-                </div>
-            `;
-
-            overlay.appendChild(item);
-            setTimeout(() => { if (item.parentNode === overlay) overlay.removeChild(item); }, 15000);
-        }
-
-        // FLOATING EMOJI REACTION AS ANIMATED CHAT PILL
-        function displayFloatingReactionMessage(name, photoUrl, emoji) {
-            const overlay = document.getElementById('live-chat-overlay');
-            const item = document.createElement('div');
-            item.className = "tg-chat-bubble px-3.5 py-1.5 rounded-full text-xs flex items-center gap-2 max-w-[90%] text-white pointer-events-auto border border-white/15 shadow-2xl";
-            
-            let avatarHtml = '';
-            if (photoUrl) {
-                avatarHtml = `<img src="${photoUrl}" class="w-5 h-5 rounded-full object-cover shrink-0 border border-white/20">`;
-            } else {
-                avatarHtml = `<div class="w-5 h-5 rounded-full bg-slate-700 text-white flex items-center justify-center text-[10px] font-bold shrink-0 border border-white/20">${(name || "U")[0].toUpperCase()}</div>`;
-            }
-
-            item.innerHTML = `
-                ${avatarHtml}
-                <div class="flex items-center gap-2 overflow-hidden">
-                    <span class="font-bold text-[11px] text-sky-400 shrink-0 truncate max-w-[110px]">${name}:</span>
-                    <span class="animated-chat-emoji">${emoji}</span>
-                </div>
-            `;
-
-            overlay.appendChild(item);
-            setTimeout(() => { if (item.parentNode === overlay) overlay.removeChild(item); }, 8000);
         }
 
         async function leaveSpace() {
