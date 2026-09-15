@@ -15,11 +15,11 @@
         * { font-family: 'Plus Jakarta Sans', -apple-system, sans-serif; transition: background-color 0.2s ease, color 0.2s ease; }
         
         html.dark body {
-            background: radial-gradient(circle at 50% 8%, #1e1b4b 0%, #0b0f19 50%, #05070d 100%);
+            background: #0e121a;
             color: #f8fafc;
         }
         html.light body {
-            background: radial-gradient(circle at 50% 8%, #e0e7ff 0%, #f1f5f9 50%, #e2e8f0 100%);
+            background: #f1f5f9;
             color: #0f172a;
         }
 
@@ -29,15 +29,13 @@
         }
 
         html.dark .glass-panel {
-            background: rgba(22, 30, 49, 0.7);
+            background: rgba(26, 34, 48, 0.85);
             backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
             border: 1px solid rgba(255, 255, 255, 0.08);
         }
         html.light .glass-panel {
-            background: rgba(255, 255, 255, 0.8);
+            background: rgba(255, 255, 255, 0.9);
             backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
             border: 1px solid rgba(0, 0, 0, 0.08);
         }
 
@@ -50,19 +48,33 @@
             border: 1px solid rgba(0, 0, 0, 0.06);
         }
 
-        .chat-bubble-enter {
-            animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        .tg-floating-pill {
+            animation: slideUpPill 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            background: rgba(27, 34, 47, 0.92);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
         }
-        @keyframes slideUp {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
+        html.light .tg-floating-pill {
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+        }
+
+        @keyframes slideUpPill {
+            from { opacity: 0; transform: translateY(10px) scale(0.95); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .tg-pill-exit {
+            animation: fadeOutPill 0.35s ease-out forwards;
+        }
+        @keyframes fadeOutPill {
+            from { opacity: 1; transform: scale(1); }
+            to { opacity: 0; transform: scale(0.9); height: 0; margin: 0; padding: 0; }
         }
     </style>
 </head>
 <body class="h-screen flex flex-col justify-between p-4 select-none relative overflow-hidden">
-
-    <!-- Ambient Glow -->
-    <div class="absolute -top-24 -left-20 w-64 h-64 bg-indigo-500/15 rounded-full blur-3xl pointer-events-none"></div>
 
     <!-- Top Status Header -->
     <header class="glass-panel p-3.5 rounded-2xl flex items-center justify-between shadow-xl relative z-10">
@@ -70,7 +82,7 @@
             <span id="status-dot" class="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0 animate-pulse"></span>
             <div class="flex flex-col truncate">
                 <span class="text-sm font-bold truncate dark:text-white text-slate-900" id="group-title">Voice Space</span>
-                <span class="text-[10px] dark:text-slate-400 text-slate-500" id="connection-state">Starting Engine...</span>
+                <span class="text-[10px] dark:text-slate-400 text-slate-500" id="connection-state">Connecting...</span>
             </div>
         </div>
         
@@ -80,7 +92,6 @@
                 <span id="participant-count">0</span> Online
             </div>
 
-            <!-- Theme Toggle -->
             <button onclick="toggleTheme()" class="glass-pill p-2 rounded-xl dark:text-amber-300 text-slate-700 active:scale-90 transition">
                 <svg id="theme-icon-sun" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
                 <svg id="theme-icon-moon" class="w-4 h-4 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
@@ -93,10 +104,10 @@
         <div id="grid" class="w-full h-full max-h-[46vh] grid grid-cols-3 gap-y-6 gap-x-4 auto-rows-max overflow-y-auto px-2 items-start justify-center"></div>
     </main>
 
-    <!-- Floating Live Messages Layer (Auto-disappears in 45s, Max 10 messages) -->
-    <div id="live-chat-overlay" class="absolute bottom-24 left-4 right-4 z-20 flex flex-col justify-end space-y-2 pointer-events-none max-h-48 overflow-hidden"></div>
+    <!-- Telegram-Style Floating Messages (Above Island) -->
+    <div id="live-chat-overlay" class="absolute bottom-24 left-4 right-4 z-20 flex flex-col items-center justify-end space-y-2 pointer-events-none max-h-44 overflow-hidden"></div>
 
-    <!-- Inline Quick Chat Input Bar -->
+    <!-- Inline Quick Chat Input -->
     <div id="chat-input-bar" class="hidden absolute bottom-24 left-4 right-4 z-30 pointer-events-auto">
         <form onsubmit="handleSendChat(event)" class="glass-panel p-2 rounded-2xl flex gap-2 shadow-2xl">
             <input id="chat-input" type="text" placeholder="Type a message into voice chat..." autocomplete="off" class="flex-1 px-4 py-2.5 rounded-xl dark:bg-slate-900/80 bg-white/90 border dark:border-white/10 border-slate-300 dark:text-white text-slate-900 text-xs outline-none focus:border-indigo-500 transition">
@@ -117,7 +128,7 @@
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 8l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M5 3a2 2 0 00-2 2v1c0 8.284 6.716 15 15 15h1a2 2 0 002-2v-3.28a1 1 0 00-.684-.948l-4.493-1.498a1 1 0 00-1.21.502l-1.13 2.257a11.042 11.042 0 01-5.516-5.517l2.257-1.128a1 1 0 00.502-1.21L9.228 3.683A1 1 0 008.279 3H5z"/></svg>
         </button>
 
-        <!-- 2. Mic (Fully Centered & Responsive) -->
+        <!-- 2. Mic (Single-Permission Controlled) -->
         <button id="mic-btn" onclick="toggleMic()" class="w-14 h-14 rounded-full bg-rose-600 text-white flex items-center justify-center shadow-lg active:scale-95 transition border-2 border-white/20">
             <svg id="mic-icon" class="w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 02-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/>
@@ -125,7 +136,7 @@
             </svg>
         </button>
 
-        <!-- 3. Message Button Next To Mic -->
+        <!-- 3. Message Button -->
         <button id="chat-btn" onclick="toggleChatInput()" class="w-11 h-11 rounded-full dark:bg-indigo-600/30 bg-indigo-500/15 border border-indigo-400/30 text-indigo-500 dark:text-indigo-300 flex items-center justify-center active:scale-90 transition">
             <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
         </button>
@@ -145,7 +156,6 @@
             } catch(e) {}
         }
 
-        // Safe Theme Manager
         function setTheme(theme) {
             const html = document.getElementById('html-root');
             const sunIcon = document.getElementById('theme-icon-sun');
@@ -174,8 +184,10 @@
         let room = null;
         let isMuted = true;
         let isSpeakerOn = true;
+        let myPhotoUrl = "";
+        let localAudioTrack = null; // Stored singleton track
 
-        const MAX_MESSAGES = 10;
+        const MAX_MESSAGES = 8;
         const MESSAGE_LIFETIME = 45000;
 
         function showError(msg) {
@@ -224,6 +236,13 @@
                 document.getElementById('group-title').innerText = data.group_title || "Voice Space";
                 document.getElementById('connection-state').innerText = "Connecting...";
 
+                try {
+                    const parsedUser = tg?.initDataUnsafe?.user;
+                    if (parsedUser && parsedUser.photo_url) {
+                        myPhotoUrl = parsedUser.photo_url;
+                    }
+                } catch(e) {}
+
                 room = new LK.Room({
                     adaptiveStream: true,
                     dynacast: true
@@ -244,10 +263,11 @@
                 room.on(LK.RoomEvent.DataReceived, (payload) => {
                     try {
                         const msgObj = JSON.parse(new TextDecoder().decode(payload));
-                        displayFloatingMessage(msgObj.name, msgObj.text, false);
+                        displayFloatingMessage(msgObj.name, msgObj.photo_url, msgObj.text);
                     } catch(e) {}
                 });
 
+                // Connect to SFU (Listen only first - zero permissions triggered here)
                 await room.connect(data.livekit_url, data.token);
 
                 document.getElementById('connection-state').innerText = "Connected";
@@ -272,6 +292,10 @@
             participants.forEach(p => {
                 let meta = {};
                 try { meta = JSON.parse(p.metadata || "{}"); } catch(e) {}
+
+                if (p === room.localParticipant && meta.photo_url) {
+                    myPhotoUrl = meta.photo_url;
+                }
 
                 const card = document.createElement('div');
                 card.className = "flex flex-col items-center gap-1.5";
@@ -312,15 +336,36 @@
             });
         }
 
+        // SINGLE-PERMISSION MIC HANDLER (Never prompts twice)
         async function toggleMic() {
             if (!room) return;
+            const LK = getLiveKit();
+
             try {
-                isMuted = !isMuted;
-                await room.localParticipant.setMicrophoneEnabled(!isMuted);
+                if (!localAudioTrack) {
+                    // Requests mic hardware permission ONCE
+                    localAudioTrack = await LK.createLocalAudioTrack({
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true
+                    });
+                    await room.localParticipant.publishTrack(localAudioTrack);
+                    isMuted = false;
+                } else {
+                    // Pure mute/unmute of existing track - ZERO PERMISSION POPUPS
+                    if (isMuted) {
+                        await localAudioTrack.unmute();
+                        isMuted = false;
+                    } else {
+                        await localAudioTrack.mute();
+                        isMuted = true;
+                    }
+                }
             } catch(e) {
-                console.warn("Mic error:", e);
+                console.warn("Single permission mic error:", e);
                 isMuted = true;
             }
+
             updateMicUI();
         }
 
@@ -365,44 +410,66 @@
             if (!msg || !room) return;
 
             const myName = room.localParticipant.name || "Me";
-            const payload = JSON.stringify({ name: myName, text: msg });
+            const payload = JSON.stringify({ 
+                name: myName, 
+                photo_url: myPhotoUrl,
+                text: msg 
+            });
             room.localParticipant.publishData(new TextEncoder().encode(payload), { reliable: true });
 
-            displayFloatingMessage(myName, msg, true);
+            displayFloatingMessage(myName, myPhotoUrl, msg);
             input.value = "";
             toggleChatInput();
         }
 
-        function displayFloatingMessage(name, text, isMe) {
+        // Exact Telegram VC Pill
+        function displayFloatingMessage(name, photoUrl, text) {
             const overlay = document.getElementById('live-chat-overlay');
             if (overlay.children.length >= MAX_MESSAGES) {
                 overlay.removeChild(overlay.firstChild);
             }
 
             const item = document.createElement('div');
-            item.className = `chat-bubble-enter max-w-[85%] px-3.5 py-2 rounded-2xl text-xs backdrop-blur-md shadow-lg pointer-events-auto transition-all ${
-                isMe 
-                ? 'self-end bg-gradient-to-r from-pink-500/90 to-indigo-600/90 text-white rounded-br-sm' 
-                : 'self-start dark:bg-slate-800/90 bg-white/90 dark:text-slate-200 text-slate-800 border dark:border-white/10 border-slate-200 rounded-bl-sm'
-            }`;
-            item.innerHTML = `<span class="font-bold block text-[10px] ${isMe ? 'text-pink-100' : 'text-indigo-500'} mb-0.5">${name}</span><p class="leading-relaxed break-words">${text}</p>`;
+            item.className = "tg-floating-pill px-3 py-1.5 rounded-full text-xs flex items-center gap-2 max-w-[90%] pointer-events-auto transition-all";
+            
+            let avatarHtml = '';
+            if (photoUrl) {
+                avatarHtml = `<img src="${photoUrl}" class="w-5 h-5 rounded-full object-cover shrink-0 border border-white/20">`;
+            } else {
+                const initial = (name || "U")[0].toUpperCase();
+                avatarHtml = `<div class="w-5 h-5 rounded-full bg-slate-700 text-white flex items-center justify-center text-[10px] font-bold shrink-0 border border-white/20">${initial}</div>`;
+            }
+
+            item.innerHTML = `
+                ${avatarHtml}
+                <div class="flex items-center gap-1.5 overflow-hidden">
+                    <span class="font-bold text-[11px] dark:text-slate-100 text-slate-900 shrink-0 truncate max-w-[110px]">${name}</span>
+                    <span class="dark:text-slate-300 text-slate-700 text-[11px] truncate">${text}</span>
+                </div>
+            `;
 
             overlay.appendChild(item);
 
             setTimeout(() => {
-                if (item.parentNode === overlay) {
-                    overlay.removeChild(item);
-                }
+                item.classList.add('tg-pill-exit');
+                setTimeout(() => {
+                    if (item.parentNode === overlay) {
+                        overlay.removeChild(item);
+                    }
+                }, 350);
             }, MESSAGE_LIFETIME);
         }
 
         async function leaveSpace() {
+            if (localAudioTrack) {
+                localAudioTrack.stop();
+                localAudioTrack = null;
+            }
             if (room) await room.disconnect();
             if (tg && tg.close) tg.close();
             else window.close();
         }
 
-        // Initialize after DOM is fully loaded
         window.addEventListener('DOMContentLoaded', () => {
             try {
                 const saved = localStorage.getItem('theme_pref') || 'dark';
