@@ -14,14 +14,8 @@
     <style>
         * { font-family: 'Plus Jakarta Sans', -apple-system, sans-serif; transition: background-color 0.2s ease, color 0.2s ease; }
         
-        html.dark body {
-            background: #0e121a;
-            color: #f8fafc;
-        }
-        html.light body {
-            background: #f1f5f9;
-            color: #0f172a;
-        }
+        html.dark body { background: #0e121a; color: #f8fafc; }
+        html.light body { background: #f1f5f9; color: #0f172a; }
 
         .speaking {
             border-color: #38bdf8 !important;
@@ -63,7 +57,7 @@
 
         @keyframes slideUpPill {
             from { opacity: 0; transform: translateY(10px) scale(0.95); }
-            to { opacity: 1; transform: translateY(0) scale(1); }
+            to { opacity: 1; transform: translateY(0); }
         }
         .tg-pill-exit {
             animation: fadeOutPill 0.35s ease-out forwards;
@@ -74,7 +68,10 @@
         }
     </style>
 </head>
-<body class="h-screen flex flex-col justify-between p-4 select-none relative overflow-hidden">
+<body class="h-screen flex flex-col justify-between p-4 select-none relative overflow-hidden" onclick="resumeAudioContext()">
+
+    <!-- Audio Container for Remote Streams -->
+    <div id="remote-audio-container" class="hidden"></div>
 
     <!-- Top Status Header -->
     <header class="glass-panel p-3.5 rounded-2xl flex items-center justify-between shadow-xl relative z-10">
@@ -104,7 +101,7 @@
         <div id="grid" class="w-full h-full max-h-[46vh] grid grid-cols-3 gap-y-6 gap-x-4 auto-rows-max overflow-y-auto px-2 items-start justify-center"></div>
     </main>
 
-    <!-- Telegram-Style Floating Messages (Above Island) -->
+    <!-- Telegram-Style Floating Messages -->
     <div id="live-chat-overlay" class="absolute bottom-24 left-4 right-4 z-20 flex flex-col items-center justify-end space-y-2 pointer-events-none max-h-44 overflow-hidden"></div>
 
     <!-- Inline Quick Chat Input -->
@@ -121,14 +118,14 @@
     <!-- Error Banner -->
     <div id="error-banner" class="hidden glass-pill bg-rose-500/20 border-rose-500/40 text-rose-500 dark:text-rose-300 text-xs px-4 py-2 rounded-xl text-center mb-2 relative z-10 mx-auto max-w-xs shadow-lg"></div>
 
-    <!-- Bottom Dock Controls (Leave | Mic | Chat | Speaker) -->
+    <!-- Bottom Dock Controls (Leave | Mic | Chat | Output Switcher) -->
     <footer class="glass-panel px-5 py-3 rounded-full max-w-sm mx-auto w-full flex items-center justify-between shadow-2xl relative z-10 mb-2 border border-white/10">
         <!-- 1. Leave -->
         <button onclick="leaveSpace()" class="w-11 h-11 rounded-full bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/25 text-rose-500 flex items-center justify-center active:scale-90 transition">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 8l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M5 3a2 2 0 00-2 2v1c0 8.284 6.716 15 15 15h1a2 2 0 002-2v-3.28a1 1 0 00-.684-.948l-4.493-1.498a1 1 0 00-1.21.502l-1.13 2.257a11.042 11.042 0 01-5.516-5.517l2.257-1.128a1 1 0 00.502-1.21L9.228 3.683A1 1 0 008.279 3H5z"/></svg>
         </button>
 
-        <!-- 2. Mic (Single-Permission Controlled) -->
+        <!-- 2. Mic -->
         <button id="mic-btn" onclick="toggleMic()" class="w-14 h-14 rounded-full bg-rose-600 text-white flex items-center justify-center shadow-lg active:scale-95 transition border-2 border-white/20">
             <svg id="mic-icon" class="w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 02-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/>
@@ -141,11 +138,37 @@
             <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
         </button>
 
-        <!-- 4. Speaker -->
-        <button id="spk-btn" onclick="toggleSpeaker()" class="w-11 h-11 rounded-full dark:bg-slate-700/40 bg-slate-200 border dark:border-white/10 border-slate-300 dark:text-slate-200 text-slate-700 flex items-center justify-center active:scale-90 transition">
-            <svg id="spk-icon" class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/></svg>
+        <!-- 4. Smart Audio Output -->
+        <button id="spk-btn" onclick="toggleAudioOutput()" class="w-11 h-11 rounded-full dark:bg-slate-700/40 bg-slate-200 border dark:border-white/10 border-slate-300 dark:text-slate-200 text-slate-700 flex items-center justify-center active:scale-90 transition" title="Audio Output">
+            <svg id="icon-speaker" class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/>
+            </svg>
+            <svg id="icon-bluetooth" class="w-5 h-5 shrink-0 hidden text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7l10 10-5 5V2l5 5L7 17"/>
+            </svg>
         </button>
     </footer>
+
+    <!-- User Profile / Moderation Modal -->
+    <div id="profile-modal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="glass-panel p-5 rounded-3xl max-w-xs w-full text-center space-y-3 shadow-2xl relative">
+            <div id="modal-avatar" class="w-16 h-16 rounded-full mx-auto overflow-hidden border-2 border-indigo-500 shadow-md"></div>
+            <div>
+                <h3 id="modal-name" class="font-bold text-sm dark:text-white text-slate-900"></h3>
+                <span id="modal-role" class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full inline-block mt-1"></span>
+            </div>
+
+            <!-- Action Buttons for Admins / Bot Owner -->
+            <div id="modal-actions" class="hidden space-y-2 pt-2 border-t dark:border-white/10 border-slate-200">
+                <div class="grid grid-cols-2 gap-2">
+                    <button id="btn-mod-mute" class="py-2 px-3 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 rounded-xl text-xs font-semibold active:scale-95 transition">Mute</button>
+                    <button id="btn-mod-kick" class="py-2 px-3 bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 rounded-xl text-xs font-semibold active:scale-95 transition">Remove</button>
+                </div>
+            </div>
+
+            <button onclick="closeProfileModal()" class="w-full py-2 text-xs text-slate-400 hover:text-slate-200 transition">Close</button>
+        </div>
+    </div>
 
     <script>
         const tg = window.Telegram?.WebApp;
@@ -185,7 +208,14 @@
         let isMuted = true;
         let isSpeakerOn = true;
         let myPhotoUrl = "";
-        let localAudioTrack = null; // Stored singleton track
+        let localAudioTrack = null;
+        let bluetoothDeviceId = null;
+        let currentSinkId = "default";
+
+        // Current User Credentials
+        let currentChatId = "";
+        let amIBotOwner = false;
+        let amIGroupAdmin = false;
 
         const MAX_MESSAGES = 8;
         const MESSAGE_LIFETIME = 45000;
@@ -194,7 +224,7 @@
             const el = document.getElementById('error-banner');
             el.innerText = msg;
             el.classList.remove('hidden');
-            document.getElementById('connection-state').innerText = "Failed";
+            document.getElementById('connection-state').innerText = "Notice";
             document.getElementById('status-dot').className = "w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0";
         }
 
@@ -202,18 +232,59 @@
             return window.LivekitClient || window.livekit || window.LiveKit;
         }
 
+        function resumeAudioContext() {
+            const audios = document.querySelectorAll('audio');
+            audios.forEach(a => {
+                if (a.paused && a.srcObject) {
+                    a.play().catch(() => {});
+                }
+            });
+        }
+
+        async function detectAudioDevices() {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
+            try {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const audioOutputs = devices.filter(d => d.kind === 'audiooutput' || d.kind === 'audioinput');
+                
+                const bt = audioOutputs.find(d => 
+                    d.label.toLowerCase().includes('bluetooth') || 
+                    d.label.toLowerCase().includes('wireless') || 
+                    d.label.toLowerCase().includes('airpods') ||
+                    d.label.toLowerCase().includes('buds')
+                );
+
+                const spkIcon = document.getElementById('icon-speaker');
+                const btIcon = document.getElementById('icon-bluetooth');
+
+                if (bt) {
+                    bluetoothDeviceId = bt.deviceId;
+                    btIcon.classList.remove('hidden');
+                    spkIcon.classList.add('hidden');
+                } else {
+                    bluetoothDeviceId = null;
+                    btIcon.classList.add('hidden');
+                    spkIcon.classList.remove('hidden');
+                }
+            } catch(e) {
+                console.warn("Device enumeration:", e);
+            }
+        }
+
+        if (navigator.mediaDevices) {
+            navigator.mediaDevices.addEventListener('devicechange', detectAudioDevices);
+        }
+
         async function startVoiceSession() {
             const urlParams = new URLSearchParams(window.location.search);
-            const rawId = tg?.initDataUnsafe?.start_param || urlParams.get('tgWebAppStartParam') || urlParams.get('chat_id') || "";
+            currentChatId = tg?.initDataUnsafe?.start_param || urlParams.get('tgWebAppStartParam') || urlParams.get('chat_id') || "";
 
-            if (!rawId) {
+            if (!currentChatId) {
                 return showError("Session parameter missing. Launch via group link.");
             }
 
             const LK = getLiveKit();
-            if (!LK) {
-                return showError("Audio SDK load failed. Please reopen.");
-            }
+            if (!LK) return showError("Audio SDK load failed. Please reopen.");
 
             try {
                 document.getElementById('connection-state').innerText = "Authenticating...";
@@ -222,7 +293,7 @@
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
-                        chat_id: rawId,
+                        chat_id: currentChatId,
                         init_data: tg?.initData || ""
                     })
                 });
@@ -236,6 +307,10 @@
                 document.getElementById('group-title').innerText = data.group_title || "Voice Space";
                 document.getElementById('connection-state').innerText = "Connecting...";
 
+                // Store my role
+                amIBotOwner = data.is_owner || false;
+                amIGroupAdmin = data.is_admin || false;
+
                 try {
                     const parsedUser = tg?.initDataUnsafe?.user;
                     if (parsedUser && parsedUser.photo_url) {
@@ -244,16 +319,39 @@
                 } catch(e) {}
 
                 room = new LK.Room({
-                    adaptiveStream: true,
-                    dynacast: true
+                    adaptiveStream: false,
+                    dynacast: false,
+                    audioCaptureDefaults: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true,
+                        highpassFilter: true
+                    },
+                    publishDefaults: {
+                        dtx: false,
+                        red: true,
+                        audioPreset: LK.AudioPresets.speech
+                    }
                 });
 
-                room.on(LK.RoomEvent.TrackSubscribed, (track) => {
+                room.on(LK.RoomEvent.TrackSubscribed, (track, publication, participant) => {
                     if (track.kind === LK.Track.Kind.Audio) {
-                        const audio = track.attach();
-                        audio.autoplay = true;
-                        document.body.appendChild(audio);
+                        const container = document.getElementById('remote-audio-container');
+                        const audioEl = track.attach();
+                        audioEl.id = `audio-${participant.identity}`;
+                        audioEl.autoplay = true;
+                        audioEl.playsinline = true;
+                        container.appendChild(audioEl);
+
+                        if (currentSinkId && audioEl.setSinkId) {
+                            audioEl.setSinkId(currentSinkId).catch(() => {});
+                        }
+                        audioEl.play().catch(() => {});
                     }
+                });
+
+                room.on(LK.RoomEvent.TrackUnsubscribed, (track) => {
+                    track.detach().forEach(el => el.remove());
                 });
 
                 room.on(LK.RoomEvent.ParticipantConnected, renderUsers);
@@ -267,12 +365,12 @@
                     } catch(e) {}
                 });
 
-                // Connect to SFU (Listen only first - zero permissions triggered here)
                 await room.connect(data.livekit_url, data.token);
 
                 document.getElementById('connection-state').innerText = "Connected";
                 document.getElementById('status-dot').className = "w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0";
 
+                await detectAudioDevices();
                 updateMicUI();
                 renderUsers();
             } catch (err) {
@@ -298,11 +396,12 @@
                 }
 
                 const card = document.createElement('div');
-                card.className = "flex flex-col items-center gap-1.5";
+                card.className = "flex flex-col items-center gap-1.5 cursor-pointer active:scale-95 transition";
+                card.onclick = () => openProfileModal(p, meta);
 
                 const bubble = document.createElement('div');
                 bubble.id = `user-${p.identity}`;
-                bubble.className = `relative w-16 h-16 rounded-full border-2 ${meta.is_owner ? 'border-amber-400 shadow-md shadow-amber-400/20' : 'dark:border-white/10 border-slate-300'} flex items-center justify-center dark:bg-slate-800 bg-white overflow-hidden shadow-lg`;
+                bubble.className = `relative w-16 h-16 rounded-full border-2 ${meta.is_owner ? 'border-amber-400 shadow-md shadow-amber-400/20' : (meta.is_admin ? 'border-sky-400' : 'dark:border-white/10 border-slate-300')} flex items-center justify-center dark:bg-slate-800 bg-white overflow-hidden shadow-lg`;
 
                 if (meta.photo_url) {
                     bubble.innerHTML = `<img src="${meta.photo_url}" class="w-full h-full object-cover">`;
@@ -316,6 +415,11 @@
                     badge.className = "absolute top-0 right-0 text-[10px] bg-amber-400 text-slate-900 rounded-full px-1 font-bold";
                     badge.innerText = "★";
                     bubble.appendChild(badge);
+                } else if (meta.is_admin) {
+                    const badge = document.createElement('span');
+                    badge.className = "absolute top-0 right-0 text-[10px] bg-sky-400 text-slate-900 rounded-full px-1 font-bold";
+                    badge.innerText = "🛡";
+                    bubble.appendChild(badge);
                 }
 
                 const label = document.createElement('span');
@@ -328,6 +432,87 @@
             });
         }
 
+        // Tap on Avatar opens Profile & Role-Based Moderation
+        function openProfileModal(participant, meta) {
+            const isSelf = participant.identity === room?.localParticipant?.identity;
+            document.getElementById('modal-name').innerText = participant.name || "User";
+
+            // Render Avatar
+            const avatarBox = document.getElementById('modal-avatar');
+            if (meta.photo_url) {
+                avatarBox.innerHTML = `<img src="${meta.photo_url}" class="w-full h-full object-cover">`;
+            } else {
+                const initials = (participant.name || "U")[0].toUpperCase();
+                avatarBox.innerHTML = `<div class="w-full h-full bg-slate-700 text-white flex items-center justify-center font-bold text-lg">${initials}</div>`;
+            }
+
+            // Role Badge
+            const roleEl = document.getElementById('modal-role');
+            if (meta.is_owner) {
+                roleEl.innerText = "Bot Owner";
+                roleEl.className = "text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full inline-block mt-1 bg-amber-400/20 text-amber-400";
+            } else if (meta.is_admin) {
+                roleEl.innerText = "Group Admin";
+                roleEl.className = "text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full inline-block mt-1 bg-sky-400/20 text-sky-400";
+            } else {
+                roleEl.innerText = "Member";
+                roleEl.className = "text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full inline-block mt-1 bg-slate-500/20 text-slate-400";
+            }
+
+            // STRICT PERMISSION CHECK:
+            // 1. Bot Owner can moderate anyone except themselves.
+            // 2. Group Admin can ONLY moderate regular members (neither Bot Owner nor other Admins).
+            const targetIsOwner = meta.is_owner || false;
+            const targetIsAdmin = meta.is_admin || false;
+            
+            let canModerate = false;
+            if (!isSelf) {
+                if (amIBotOwner && !targetIsOwner) {
+                    canModerate = true; // Bot Owner moderates anyone
+                } else if (amIGroupAdmin && !targetIsOwner && !targetIsAdmin) {
+                    canModerate = true; // Group Admin moderates only members
+                }
+            }
+
+            const actionsBox = document.getElementById('modal-actions');
+            if (canModerate) {
+                actionsBox.classList.remove('hidden');
+                document.getElementById('btn-mod-mute').onclick = () => moderateUserAction(participant.identity, 'mute');
+                document.getElementById('btn-mod-kick').onclick = () => moderateUserAction(participant.identity, 'kick');
+            } else {
+                actionsBox.classList.add('hidden');
+            }
+
+            document.getElementById('profile-modal').classList.remove('hidden');
+        }
+
+        function closeProfileModal() {
+            document.getElementById('profile-modal').classList.add('hidden');
+        }
+
+        async function moderateUserAction(targetId, action) {
+            try {
+                const res = await fetch('/api/moderate-user', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        chat_id: currentChatId,
+                        init_data: tg?.initData || "",
+                        target_user_id: parseInt(targetId),
+                        action: action
+                    })
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    alert(data.detail || "Action failed");
+                } else {
+                    closeProfileModal();
+                }
+            } catch(e) {
+                alert("Network error executing action");
+            }
+        }
+
         function handleSpeakers(speakers) {
             document.querySelectorAll('[id^="user-"]').forEach(el => el.classList.remove('speaking'));
             speakers.forEach(s => {
@@ -336,23 +521,24 @@
             });
         }
 
-        // SINGLE-PERMISSION MIC HANDLER (Never prompts twice)
         async function toggleMic() {
             if (!room) return;
             const LK = getLiveKit();
 
             try {
                 if (!localAudioTrack) {
-                    // Requests mic hardware permission ONCE
                     localAudioTrack = await LK.createLocalAudioTrack({
                         echoCancellation: true,
                         noiseSuppression: true,
-                        autoGainControl: true
+                        autoGainControl: true,
+                        highpassFilter: true
                     });
-                    await room.localParticipant.publishTrack(localAudioTrack);
+                    await room.localParticipant.publishTrack(localAudioTrack, {
+                        dtx: false,
+                        red: true
+                    });
                     isMuted = false;
                 } else {
-                    // Pure mute/unmute of existing track - ZERO PERMISSION POPUPS
                     if (isMuted) {
                         await localAudioTrack.unmute();
                         isMuted = false;
@@ -362,7 +548,7 @@
                     }
                 }
             } catch(e) {
-                console.warn("Single permission mic error:", e);
+                console.warn("Mic toggle error:", e);
                 isMuted = true;
             }
 
@@ -381,18 +567,30 @@
             }
         }
 
-        function toggleSpeaker() {
-            if (!room) return;
-            isSpeakerOn = !isSpeakerOn;
-            room.remoteParticipants.forEach(p => {
-                p.audioTrackPublications.forEach(pub => {
-                    if (pub.track) pub.track.setVolume(isSpeakerOn ? 1 : 0);
+        async function toggleAudioOutput() {
+            await detectAudioDevices();
+            const audios = document.querySelectorAll('#remote-audio-container audio');
+
+            if (bluetoothDeviceId) {
+                currentSinkId = (currentSinkId === bluetoothDeviceId) ? "default" : bluetoothDeviceId;
+                audios.forEach(a => {
+                    if (a.setSinkId) a.setSinkId(currentSinkId).catch(() => {});
                 });
-            });
-            const btn = document.getElementById('spk-btn');
-            btn.className = isSpeakerOn 
-                ? "w-11 h-11 rounded-full dark:bg-slate-700/40 bg-slate-200 border dark:border-white/10 border-slate-300 dark:text-slate-200 text-slate-700 flex items-center justify-center active:scale-90 transition" 
-                : "w-11 h-11 rounded-full dark:bg-slate-800 bg-slate-300 text-slate-400 flex items-center justify-center active:scale-90 transition";
+
+                const btIcon = document.getElementById('icon-bluetooth');
+                if (currentSinkId === bluetoothDeviceId) {
+                    btIcon.classList.add('text-sky-400');
+                } else {
+                    btIcon.classList.remove('text-sky-400');
+                }
+            } else {
+                isSpeakerOn = !isSpeakerOn;
+                audios.forEach(a => a.muted = !isSpeakerOn);
+                const btn = document.getElementById('spk-btn');
+                btn.className = isSpeakerOn 
+                    ? "w-11 h-11 rounded-full dark:bg-slate-700/40 bg-slate-200 border dark:border-white/10 border-slate-300 dark:text-slate-200 text-slate-700 flex items-center justify-center active:scale-90 transition" 
+                    : "w-11 h-11 rounded-full dark:bg-slate-800 bg-slate-300 text-slate-400 flex items-center justify-center active:scale-90 transition";
+            }
         }
 
         function toggleChatInput() {
@@ -422,7 +620,6 @@
             toggleChatInput();
         }
 
-        // Exact Telegram VC Pill
         function displayFloatingMessage(name, photoUrl, text) {
             const overlay = document.getElementById('live-chat-overlay');
             if (overlay.children.length >= MAX_MESSAGES) {
