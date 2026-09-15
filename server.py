@@ -36,28 +36,24 @@ app.add_middleware(
 if os.path.exists("static"):
     app.mount("/static", StaticFiles(directory="static"), name="static")
 
-
 @app.get("/")
 async def root():
     return FileResponse("static/index.html")
-
 
 class TokenRequest(BaseModel):
     chat_id: str
     init_data: str
 
-
 class EndRoomRequest(BaseModel):
     chat_id: str
     init_data: str
-
 
 class ModerateRequest(BaseModel):
     chat_id: str
     init_data: str
     target_user_id: int
-    action: str
-
+    action: str  # "mute", "unmute", "kick"
+    allow_admin_unmute: bool = False
 
 def verify_telegram_init_data(init_data: str, bot_token: str):
     try:
@@ -77,7 +73,6 @@ def verify_telegram_init_data(init_data: str, bot_token: str):
     except Exception:
         return False, {}
 
-
 @app.post("/api/get-token")
 async def get_token(req: TokenRequest):
     is_valid, user_data = verify_telegram_init_data(req.init_data, BOT_TOKEN)
@@ -90,11 +85,7 @@ async def get_token(req: TokenRequest):
     photo_url = user_data.get("photo_url", "")
 
     incoming_param = req.chat_id.replace("vc_", "").replace("room_", "")
-
-    if "x" in incoming_param:
-        raw_chat_part, _ = incoming_param.split("x", 1)
-    else:
-        raw_chat_part = incoming_param
+    raw_chat_part = incoming_param.split("x")[0] if "x" in incoming_param else incoming_param
 
     candidate_ids = [
         raw_chat_part,
@@ -121,13 +112,15 @@ async def get_token(req: TokenRequest):
 
     active_session = room_data.get("active_session")
     if active_session and incoming_param != active_session:
-        raise HTTPException(status_code=403, detail="Session expired. Please use the newest link.")
+        raise HTTPException(status_code=403, detail="Session expired.")
 
     group_title = room_data.get("title", "Voice Space")
     admins = room_data.get("admins", [])
+    muted_list = room_data.get("muted_users", {})
 
     is_owner = user_id in OWNER_IDS
     is_admin = user_id in admins
+    is_muted = str(user_id) in muted_list
 
     room_name = f"room_{matched_chat_id or raw_chat_part}"
 
@@ -135,14 +128,17 @@ async def get_token(req: TokenRequest):
         "username": username,
         "photo_url": photo_url,
         "is_owner": is_owner,
-        "is_admin": is_admin
+        "is_admin": is_admin,
+        "is_muted": is_muted,
+        "muted_by_owner": muted_list.get(str(user_id), {}).get("by_owner", False),
+        "allow_admin_unmute": muted_list.get(str(user_id), {}).get("allow_admin", False)
     })
 
     try:
         grants = api.VideoGrants(
             room_join=True,
             room=room_name,
-            can_publish=True,
+            can_publish=not is_muted,
             can_subscribe=True,
             can_publish_data=True
         )
@@ -150,7 +146,7 @@ async def get_token(req: TokenRequest):
         grants = api.VideoGrant(
             room_join=True,
             room=room_name,
-            can_publish=True,
+            can_publish=not is_muted,
             can_subscribe=True,
             can_publish_data=True
         )
@@ -169,48 +165,9 @@ async def get_token(req: TokenRequest):
         "livekit_url": LIVEKIT_URL,
         "group_title": group_title,
         "is_admin": is_admin,
-        "is_owner": is_owner
+        "is_owner": is_owner,
+        "is_muted": is_muted
     }
-
-
-@app.post("/api/end-room")
-async def end_room(req: EndRoomRequest):
-    is_valid, user_data = verify_telegram_init_data(req.init_data, BOT_TOKEN)
-    if not is_valid:
-        raise HTTPException(status_code=401, detail="Unauthorized")
-
-    user_id = user_data.get("id")
-    raw_chat = req.chat_id.replace("vc_", "").replace("room_", "")
-    if "x" in raw_chat:
-        raw_chat = raw_chat.split("x")[0]
-
-    normalized_chat_id = raw_chat if raw_chat.startswith("-") else (
-        raw_chat if raw_chat.startswith("-100") else f"-100{raw_chat}"
-    )
-
-    room_data = await get_room(normalized_chat_id)
-    if not room_data:
-        room_data = await get_room(raw_chat)
-
-    admins = room_data.get("admins", []) if room_data else []
-
-    if user_id not in OWNER_IDS and user_id not in admins:
-        raise HTTPException(status_code=403, detail="Permission Denied")
-
-    lk_api = api.LiveKitAPI(LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET)
-    try:
-        stored_cid = room_data.get("chat_id") if room_data else normalized_chat_id
-        room_name = f"room_{stored_cid}"
-        await lk_api.room.delete_room(api.DeleteRoomRequest(room=room_name))
-        await delete_room(normalized_chat_id)
-        await delete_room(raw_chat)
-    except Exception:
-        pass
-    finally:
-        await lk_api.aclose()
-
-    return {"status": "ok"}
-
 
 @app.post("/api/moderate-user")
 async def moderate_user(req: ModerateRequest):
@@ -236,6 +193,7 @@ async def moderate_user(req: ModerateRequest):
         raise HTTPException(status_code=404, detail="Voice Space not found")
 
     admins = room_data.get("admins", [])
+    muted_users = room_data.get("muted_users", {})
     caller_is_owner = caller_id in OWNER_IDS
     caller_is_admin = caller_id in admins
 
@@ -246,8 +204,17 @@ async def moderate_user(req: ModerateRequest):
         raise HTTPException(status_code=403, detail="Cannot moderate Bot Owner")
 
     target_is_admin = req.target_user_id in admins
+    target_str = str(req.target_user_id)
+
+    # RULE 1: Group admin dusre admin ko mute ya kick nahi kar sakta
     if not caller_is_owner and target_is_admin:
-        raise HTTPException(status_code=403, detail="Group Admins can only moderate regular members")
+        raise HTTPException(status_code=403, detail="Group Admins cannot moderate other Admins")
+
+    # RULE 2: Agar owner ne mute kiya hai aur allow_admin_unmute nahi diya, toh admin unmute nahi kar sakta
+    if req.action == "unmute" and not caller_is_owner:
+        lock_info = muted_users.get(target_str, {})
+        if lock_info.get("by_owner") and not lock_info.get("allow_admin"):
+            raise HTTPException(status_code=403, detail="Only Bot Owner can unmute this user.")
 
     stored_cid = room_data.get("chat_id", normalized_chat_id)
     room_name = f"room_{stored_cid}"
@@ -256,22 +223,75 @@ async def moderate_user(req: ModerateRequest):
     try:
         if req.action == "kick":
             await lk_api.room.remove_participant(
-                api.RoomParticipantIdentity(room=room_name, identity=str(req.target_user_id))
+                api.RoomParticipantIdentity(room=room_name, identity=target_str)
             )
+            muted_users.pop(target_str, None)
+
         elif req.action == "mute":
+            # Hardware mute track
             try:
                 await lk_api.room.mute_published_track(
                     api.MuteRoomTrackRequest(
                         room=room_name,
-                        identity=str(req.target_user_id),
+                        identity=target_str,
                         track_sid="",
                         muted=True
                     )
                 )
-            except Exception as mute_err:
-                print(f"[Warning] Mute execution: {mute_err}")
+            except Exception:
+                pass
+
+            # DB persistence of mute hierarchy
+            muted_users[target_str] = {
+                "by_owner": caller_is_owner,
+                "allow_admin": req.allow_admin_unmute if caller_is_owner else False
+            }
+
+        elif req.action == "unmute":
+            muted_users.pop(target_str, None)
+
+        await rooms_collection.update_one(
+            {"chat_id": room_data.get("chat_id")},
+            {"$set": {"muted_users": muted_users}}
+        )
+
+    finally:
+        await lk_api.aclose()
+
+    return {"status": "ok", "muted_users": muted_users}
+
+@app.post("/api/end-room")
+async def end_room(req: EndRoomRequest):
+    is_valid, user_data = verify_telegram_init_data(req.init_data, BOT_TOKEN)
+    if not is_valid:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    user_id = user_data.get("id")
+    raw_chat = req.chat_id.replace("vc_", "").replace("room_", "")
+    raw_chat = raw_chat.split("x")[0] if "x" in raw_chat else raw_chat
+
+    normalized_chat_id = raw_chat if raw_chat.startswith("-") else (
+        raw_chat if raw_chat.startswith("-100") else f"-100{raw_chat}"
+    )
+
+    room_data = await get_room(normalized_chat_id)
+    if not room_data:
+        room_data = await get_room(raw_chat)
+
+    admins = room_data.get("admins", []) if room_data else []
+    if user_id not in OWNER_IDS and user_id not in admins:
+        raise HTTPException(status_code=403, detail="Permission Denied")
+
+    lk_api = api.LiveKitAPI(LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET)
+    try:
+        stored_cid = room_data.get("chat_id") if room_data else normalized_chat_id
+        await lk_api.room.delete_room(api.DeleteRoomRequest(room=f"room_{stored_cid}"))
+        await delete_room(normalized_chat_id)
+        await delete_room(raw_chat)
+    except Exception:
+        pass
     finally:
         await lk_api.aclose()
 
     return {"status": "ok"}
-  
+    
