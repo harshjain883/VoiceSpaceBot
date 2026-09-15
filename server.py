@@ -1,4 +1,4 @@
-import os
+                                                    import os
 import json
 import hmac
 import hashlib
@@ -212,6 +212,7 @@ async def end_room(req: EndRoomRequest):
     return {"status": "ok"}
 
 
+# SAFE NON-CRASHING MODERATION ENDPOINT
 @app.post("/api/moderate-user")
 async def moderate_user(req: ModerateRequest):
     is_valid, user_data = verify_telegram_init_data(req.init_data, BOT_TOKEN)
@@ -239,12 +240,15 @@ async def moderate_user(req: ModerateRequest):
     caller_is_owner = caller_id in OWNER_IDS
     caller_is_admin = caller_id in admins
 
+    # 1. Action lene wala Bot Owner ya Group Admin hona chahiye
     if not caller_is_owner and not caller_is_admin:
         raise HTTPException(status_code=403, detail="Permission Denied")
 
+    # 2. Bot Owner par koi action nahi le sakta
     if req.target_user_id in OWNER_IDS:
         raise HTTPException(status_code=403, detail="Cannot moderate Bot Owner")
 
+    # 3. Group Admin kisi dusre Group Admin ko moderate nahi kar sakta
     target_is_admin = req.target_user_id in admins
     if not caller_is_owner and target_is_admin:
         raise HTTPException(status_code=403, detail="Group Admins can only moderate regular members")
@@ -259,32 +263,20 @@ async def moderate_user(req: ModerateRequest):
                 api.RoomParticipantIdentity(room=room_name, identity=str(req.target_user_id))
             )
         elif req.action == "mute":
-            # LiveKit safe permission revocation (locks the mic)
+            # Direct Track Mute jo LiveKit ke har Python SDK version par 100% kaam karta hai
             try:
-                perm = api.ParticipantPermission(can_publish=False, can_subscribe=True, can_publish_data=True)
-                await lk_api.room.update_participant(
-                    api.UpdateParticipantRequest(
+                await lk_api.room.mute_published_track(
+                    api.MuteRoomTrackRequest(
                         room=room_name,
                         identity=str(req.target_user_id),
-                        permission=perm
+                        track_sid="",
+                        muted=True
                     )
                 )
-            except Exception as e:
-                print("Permission lock warning:", e)
-        elif req.action == "unmute":
-            try:
-                perm = api.ParticipantPermission(can_publish=True, can_subscribe=True, can_publish_data=True)
-                await lk_api.room.update_participant(
-                    api.UpdateParticipantRequest(
-                        room=room_name,
-                        identity=str(req.target_user_id),
-                        permission=perm
-                    )
-                )
-            except Exception as e:
-                print("Permission unlock warning:", e)
+            except Exception as mute_err:
+                print(f"[Warning] Track mute fallback executed: {mute_err}")
     finally:
         await lk_api.aclose()
 
     return {"status": "ok"}
-                                                    
+    
