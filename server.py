@@ -10,6 +10,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from livekit import api
 from dotenv import load_dotenv
+import httpx
 
 from db import get_room, delete_room, rooms_collection
 
@@ -24,6 +25,13 @@ raw_owners = os.getenv("OWNER_ID", "")
 OWNER_IDS = [int(x.strip()) for x in raw_owners.split(",") if x.strip().isdigit()]
 
 app = FastAPI()
+
+# Microphone Policy Middleware for Telegram In-App WebView
+@app.middleware("http")
+async def add_permission_headers(request, call_next):
+    response = await call_next(request)
+    response.headers["Permissions-Policy"] = "microphone=(self)"
+    return response
 
 app.add_middleware(
     CORSMiddleware,
@@ -72,6 +80,41 @@ def verify_telegram_init_data(init_data: str, bot_token: str):
         return False, {}
     except Exception:
         return False, {}
+
+async def fetch_telegram_chat_photo(chat_id: str) -> str:
+    """Telegram Bot API se group ki high-res profile photo ka URL nikalta hai"""
+    if not BOT_TOKEN or not chat_id:
+        return None
+    try:
+        async with httpx.AsyncClient(timeout=4.0) as client:
+            # 1. Get Chat Details
+            get_chat_url = f"https://api.telegram.org/bot{BOT_TOKEN}/getChat?chat_id={chat_id}"
+            res = await client.get(get_chat_url)
+            data = res.json()
+            if not data.get("ok"):
+                return None
+
+            photo_data = data.get("result", {}).get("photo", {})
+            file_id = photo_data.get("big_file_id") or photo_data.get("small_file_id")
+            if not file_id:
+                return None
+
+            # 2. Get File Path
+            get_file_url = f"https://api.telegram.org/bot{BOT_TOKEN}/getFile?file_id={file_id}"
+            res_file = await client.get(get_file_url)
+            file_json = res_file.json()
+            if not file_json.get("ok"):
+                return None
+
+            file_path = file_json.get("result", {}).get("file_path")
+            if not file_path:
+                return None
+
+            # 3. Direct CDN Link
+            return f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file_path}"
+    except Exception as e:
+        print(f"Error fetching group profile photo: {e}")
+        return None
 
 @app.post("/api/get-token")
 async def get_token(req: TokenRequest):
@@ -122,6 +165,10 @@ async def get_token(req: TokenRequest):
     is_admin = user_id in admins
     is_muted = str(user_id) in muted_list
 
+    # Group DP fetch karein
+    actual_chat_id = matched_chat_id or raw_chat_part
+    group_photo_url = await fetch_telegram_chat_photo(actual_chat_id)
+
     room_name = f"room_{matched_chat_id or raw_chat_part}"
 
     metadata = json.dumps({
@@ -164,6 +211,7 @@ async def get_token(req: TokenRequest):
         "token": token,
         "livekit_url": LIVEKIT_URL,
         "group_title": group_title,
+        "group_photo_url": group_photo_url,
         "is_admin": is_admin,
         "is_owner": is_owner,
         "is_muted": is_muted
@@ -228,7 +276,6 @@ async def moderate_user(req: ModerateRequest):
             muted_users.pop(target_str, None)
 
         elif req.action == "mute":
-            # Hardware mute track
             try:
                 await lk_api.room.mute_published_track(
                     api.MuteRoomTrackRequest(
@@ -241,7 +288,6 @@ async def moderate_user(req: ModerateRequest):
             except Exception:
                 pass
 
-            # DB persistence of mute hierarchy
             muted_users[target_str] = {
                 "by_owner": caller_is_owner,
                 "allow_admin": req.allow_admin_unmute if caller_is_owner else False
@@ -294,4 +340,3 @@ async def end_room(req: EndRoomRequest):
         await lk_api.aclose()
 
     return {"status": "ok"}
-    
