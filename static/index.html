@@ -62,7 +62,7 @@
 
         .speaking-ring {
             border-color: #22c55e !important;
-            box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.35), 0 0 18px rgba(34, 197, 94, 0.45) !important;
+            box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.4), 0 0 20px rgba(34, 197, 94, 0.6) !important;
         }
     </style>
 </head>
@@ -227,7 +227,6 @@
         let isSpeakingNow = false;
         let myPhotoUrl = "";
         let localAudioTrack = null;
-        let globalMediaStream = null;
 
         let currentChatId = "";
         let amIBotOwner = false;
@@ -348,10 +347,9 @@
                             if (msg.targetId === myId) {
                                 if (msg.state.is_muted) {
                                     amIHardLocked = true;
-                                    if (globalMediaStream) {
-                                        globalMediaStream.getAudioTracks().forEach(t => t.enabled = false);
+                                    if (localAudioTrack) {
+                                        await localAudioTrack.mute();
                                     }
-                                    if (localAudioTrack) await localAudioTrack.mute();
                                     isMuted = true;
                                     isSpeakingNow = false;
                                     updateMicUI();
@@ -384,7 +382,7 @@
             }
         }
 
-        // MIC TOGGLE: Single Permission with Stream Reuse on Rejoin
+        // STEP 1 FIX: Clean, Instant Hardware Mute/Unmute Toggle
         async function toggleMic() {
             if (!room) return;
             if (amIHardLocked) {
@@ -392,22 +390,17 @@
             }
 
             const LK = getLiveKit();
-            const activeTrack = globalMediaStream?.getAudioTracks()[0];
-            const isTrackDead = !activeTrack || activeTrack.readyState === 'ended';
 
-            if (isTrackDead) {
+            // Pehli baar create karo
+            if (!localAudioTrack) {
                 try {
-                    globalMediaStream = await navigator.mediaDevices.getUserMedia({
-                        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-                        video: false
+                    localAudioTrack = await LK.createLocalAudioTrack({
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true
                     });
-                    
-                    const newTrack = globalMediaStream.getAudioTracks()[0];
-                    localAudioTrack = new LK.LocalAudioTrack(newTrack);
                     await room.localParticipant.publishTrack(localAudioTrack);
-                    
                     isMuted = false;
-                    newTrack.enabled = true;
                     updateMicUI();
                     return;
                 } catch (err) {
@@ -416,16 +409,12 @@
                 }
             }
 
-            if (!room.localParticipant.getTrackPublication(LK.Track.Source.Microphone)) {
-                localAudioTrack = new LK.LocalAudioTrack(activeTrack);
-                await room.localParticipant.publishTrack(localAudioTrack);
-            }
-
+            // LiveKit official mute / unmute state
             if (isMuted) {
-                activeTrack.enabled = true;
+                await localAudioTrack.unmute();
                 isMuted = false;
             } else {
-                activeTrack.enabled = false;
+                await localAudioTrack.mute();
                 isMuted = true;
                 isSpeakingNow = false;
             }
@@ -661,15 +650,21 @@
             }
         }
 
+        // STEP 2 FIX: Real-time speaking detection sync
         function handleSpeakers(speakers) {
-            document.querySelectorAll('[id^="user-"]').forEach(el => el.classList.remove('speaking-ring'));
+            document.querySelectorAll('[id^="user-"]').forEach(el => {
+                el.classList.remove('speaking-ring');
+            });
+
             let amISpeaking = false;
 
             speakers.forEach(s => {
-                const t = document.getElementById(`user-${s.identity}`);
-                if (t) t.classList.add('speaking-ring');
+                const bubble = document.getElementById(`user-${s.identity}`);
+                if (bubble) {
+                    bubble.classList.add('speaking-ring');
+                }
 
-                if (room && s.identity === room.localParticipant.identity) {
+                if (room && String(s.identity) === String(room.localParticipant.identity)) {
                     amISpeaking = true;
                 }
             });
@@ -722,10 +717,12 @@
             setTimeout(() => { if (item.parentNode === overlay) overlay.removeChild(item); }, 15000);
         }
 
-        // LEAVE SPACE: Releases room without killing media stream to prevent pop-up on re-entry
+        // STEP 3 FIX: Safe Leave Cleanup
         async function leaveSpace() {
-            if (globalMediaStream) {
-                globalMediaStream.getAudioTracks().forEach(t => t.enabled = false);
+            if (localAudioTrack) {
+                try {
+                    await localAudioTrack.mute();
+                } catch(e) {}
             }
             if (room) {
                 await room.disconnect();
