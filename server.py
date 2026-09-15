@@ -2,6 +2,8 @@ import os
 import json
 import hmac
 import hashlib
+import urllib.request
+import asyncio
 from urllib.parse import parse_qsl
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,7 +12,6 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from livekit import api
 from dotenv import load_dotenv
-import httpx
 
 from db import get_room, delete_room, rooms_collection
 
@@ -26,7 +27,7 @@ OWNER_IDS = [int(x.strip()) for x in raw_owners.split(",") if x.strip().isdigit(
 
 app = FastAPI()
 
-# Microphone Policy Middleware for Telegram In-App WebView
+# Microphone Permission Policy Middleware for Telegram In-App WebView
 @app.middleware("http")
 async def add_permission_headers(request, call_next):
     response = await call_next(request)
@@ -81,40 +82,42 @@ def verify_telegram_init_data(init_data: str, bot_token: str):
     except Exception:
         return False, {}
 
-async def fetch_telegram_chat_photo(chat_id: str) -> str:
-    """Telegram Bot API se group ki high-res profile photo ka URL nikalta hai"""
+def _sync_fetch_chat_photo(chat_id: str) -> str:
+    """Built-in urllib se Telegram group photo nikalta hai bina kisi external library ke"""
     if not BOT_TOKEN or not chat_id:
         return None
     try:
-        async with httpx.AsyncClient(timeout=4.0) as client:
-            # 1. Get Chat Details
-            get_chat_url = f"https://api.telegram.org/bot{BOT_TOKEN}/getChat?chat_id={chat_id}"
-            res = await client.get(get_chat_url)
-            data = res.json()
+        get_chat_url = f"https://api.telegram.org/bot{BOT_TOKEN}/getChat?chat_id={chat_id}"
+        req = urllib.request.Request(get_chat_url, headers={"User-Agent": "VoiceSpaceBot"})
+        with urllib.request.urlopen(req, timeout=4) as res:
+            data = json.loads(res.read().decode())
             if not data.get("ok"):
                 return None
 
-            photo_data = data.get("result", {}).get("photo", {})
-            file_id = photo_data.get("big_file_id") or photo_data.get("small_file_id")
-            if not file_id:
-                return None
+        photo_data = data.get("result", {}).get("photo", {})
+        file_id = photo_data.get("big_file_id") or photo_data.get("small_file_id")
+        if not file_id:
+            return None
 
-            # 2. Get File Path
-            get_file_url = f"https://api.telegram.org/bot{BOT_TOKEN}/getFile?file_id={file_id}"
-            res_file = await client.get(get_file_url)
-            file_json = res_file.json()
+        get_file_url = f"https://api.telegram.org/bot{BOT_TOKEN}/getFile?file_id={file_id}"
+        req_file = urllib.request.Request(get_file_url, headers={"User-Agent": "VoiceSpaceBot"})
+        with urllib.request.urlopen(req_file, timeout=4) as res_file:
+            file_json = json.loads(res_file.read().decode())
             if not file_json.get("ok"):
                 return None
 
-            file_path = file_json.get("result", {}).get("file_path")
-            if not file_path:
-                return None
+        file_path = file_json.get("result", {}).get("file_path")
+        if not file_path:
+            return None
 
-            # 3. Direct CDN Link
-            return f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file_path}"
+        return f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file_path}"
     except Exception as e:
         print(f"Error fetching group profile photo: {e}")
         return None
+
+async def fetch_telegram_chat_photo(chat_id: str) -> str:
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, _sync_fetch_chat_photo, chat_id)
 
 @app.post("/api/get-token")
 async def get_token(req: TokenRequest):
@@ -165,7 +168,6 @@ async def get_token(req: TokenRequest):
     is_admin = user_id in admins
     is_muted = str(user_id) in muted_list
 
-    # Group DP fetch karein
     actual_chat_id = matched_chat_id or raw_chat_part
     group_photo_url = await fetch_telegram_chat_photo(actual_chat_id)
 
@@ -254,11 +256,9 @@ async def moderate_user(req: ModerateRequest):
     target_is_admin = req.target_user_id in admins
     target_str = str(req.target_user_id)
 
-    # RULE 1: Group admin dusre admin ko mute ya kick nahi kar sakta
     if not caller_is_owner and target_is_admin:
         raise HTTPException(status_code=403, detail="Group Admins cannot moderate other Admins")
 
-    # RULE 2: Agar owner ne mute kiya hai aur allow_admin_unmute nahi diya, toh admin unmute nahi kar sakta
     if req.action == "unmute" and not caller_is_owner:
         lock_info = muted_users.get(target_str, {})
         if lock_info.get("by_owner") and not lock_info.get("allow_admin"):
