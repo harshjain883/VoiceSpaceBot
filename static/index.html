@@ -102,7 +102,7 @@
     <!-- Dock Controls -->
     <footer class="aesthetic-dock w-full max-w-sm mx-auto px-4 py-3 flex items-center justify-between relative z-10 mb-2">
         
-        <!-- Fast Instant Audio Routing Button -->
+        <!-- 3-Way Instant Audio Router -->
         <div class="flex flex-col items-center gap-1.5 flex-1">
             <button id="spk-btn" onclick="cycleAudioRoute()" class="w-12 h-12 rounded-full bg-sky-500/15 dark:bg-sky-400/20 text-sky-600 dark:text-sky-400 border border-sky-500/30 flex items-center justify-center shadow-sm active:scale-90 transition">
                 <!-- Loudspeaker Icon -->
@@ -113,7 +113,7 @@
                 <svg id="icon-bluetooth" class="w-5 h-5 hidden" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M17.71 7.71L12 2h-1v7.59L6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 11 14.41V22h1l5.71-5.71-4.3-4.29 4.3-4.29zM13 5.83l1.88 1.88L13 9.59V5.83zm1.88 10.46L13 18.17v-3.76l1.88 1.88z"/>
                 </svg>
-                <!-- Earpiece (Calling Speaker) Icon -->
+                <!-- Earpiece Icon -->
                 <svg id="icon-earpiece" class="w-5 h-5 hidden" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M6.62 10.79a15.053 15.053 0 006.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/>
                 </svg>
@@ -153,7 +153,7 @@
 
     </footer>
 
-    <!-- Custom In-App Modal (Clean) -->
+    <!-- In-App Dialog -->
     <div id="custom-app-dialog" class="hidden fixed inset-0 z-50 bg-black/65 backdrop-blur-sm flex items-center justify-center p-5">
         <div class="glass-panel p-5 rounded-3xl max-w-xs w-full text-left space-y-3 shadow-2xl border border-white/10">
             <div class="flex items-center justify-between">
@@ -231,10 +231,28 @@
         let participantStates = {};
         let userVolumes = {};
 
-        // RELIABLE HARDWARE ROUTING STATE
-        let currentRoute = 'speaker'; // 'speaker' | 'bluetooth' | 'earpiece'
+        // HARDWARE ROUTE STATES
+        let currentRoute = 'speaker'; // 'speaker' (Loud) | 'bluetooth' | 'earpiece' (Call)
         let cachedDevices = { bluetooth: null, speaker: null, earpiece: null };
-        let hasHardwareAccess = false;
+
+        // WEB AUDIO CONTEXT (Forces Android OS out of phone-call mode to Speaker)
+        let audioCtx = null;
+
+        function getAudioContext() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (AudioContext) audioCtx = new AudioContext();
+            }
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume().catch(() => {});
+            }
+            return audioCtx;
+        }
+
+        function resumeAudioContext() {
+            getAudioContext();
+            document.querySelectorAll('audio').forEach(a => { if (a.paused && a.srcObject) a.play().catch(() => {}); });
+        }
 
         function showError(msg) {
             const el = document.getElementById('error-banner');
@@ -244,31 +262,22 @@
 
         function getLiveKit() { return window.LivekitClient || window.livekit || window.LiveKit; }
 
-        function resumeAudioContext() {
-            document.querySelectorAll('audio').forEach(a => { if (a.paused && a.srcObject) a.play().catch(() => {}); });
-        }
-
-        // HARDWARE AUDIO DETECTION (Handles Mobile Privacy Masking)
+        // HARDWARE AUDIO DETECTION
         async function refreshAudioDevices() {
             if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
             try {
                 const devices = await navigator.mediaDevices.enumerateDevices();
                 const outputs = devices.filter(d => d.kind === 'audiooutput');
 
-                // Check if browser reveals actual device labels (requires 1-time mic access on phone)
-                const hasLabels = outputs.some(d => d.label && d.label.length > 0);
-                if (hasLabels) hasHardwareAccess = true;
-
                 cachedDevices = { bluetooth: null, speaker: null, earpiece: null };
 
                 for (const d of outputs) {
                     const label = (d.label || '').toLowerCase();
-                    // Detect all wireless/bluetooth/earbuds profiles
                     if (/bluetooth|buds|airpod|headset|wireless|hands-free|bt|tws|headphone/i.test(label)) {
                         if (!cachedDevices.bluetooth) cachedDevices.bluetooth = d;
-                    } else if (/earpiece|receiver|telephony|handset|call speaker/i.test(label)) {
+                    } else if (/earpiece|receiver|telephony|handset|phone/i.test(label)) {
                         if (!cachedDevices.earpiece) cachedDevices.earpiece = d;
-                    } else if (/speaker|speakerphone|built-in|loudspeaker/i.test(label) && !/earpiece|receiver/i.test(label)) {
+                    } else if (/speaker|speakerphone|built-in|loudspeaker/i.test(label)) {
                         if (!cachedDevices.speaker) cachedDevices.speaker = d;
                     }
                 }
@@ -277,7 +286,7 @@
                     cachedDevices.speaker = outputs.find(d => d.deviceId === 'default') || outputs[0];
                 }
 
-                // If Bluetooth detected on phone/laptop, prioritize it automatically
+                // Auto-set Initial Route: Bluetooth agar ho toh Bluetooth, warna Loudspeaker
                 if (cachedDevices.bluetooth) {
                     currentRoute = 'bluetooth';
                 } else if (currentRoute === 'bluetooth') {
@@ -285,13 +294,14 @@
                 }
 
                 updateRouteUI();
-                applySinkToAllAudio();
+                await applyHardwareRouting();
             } catch(e) {
                 console.warn("Audio refresh:", e);
             }
         }
 
-        function cycleAudioRoute() {
+        // 3-WAY CYCLE
+        async function cycleAudioRoute() {
             if (cachedDevices.bluetooth) {
                 if (currentRoute === 'bluetooth') currentRoute = 'speaker';
                 else if (currentRoute === 'speaker') currentRoute = 'earpiece';
@@ -302,7 +312,7 @@
             }
 
             updateRouteUI();
-            applySinkToAllAudio();
+            await applyHardwareRouting();
         }
 
         function updateRouteUI() {
@@ -331,31 +341,52 @@
             }
         }
 
-        function getTargetDeviceId() {
-            if (currentRoute === 'bluetooth' && cachedDevices.bluetooth) {
-                return cachedDevices.bluetooth.deviceId;
-            }
-            if (currentRoute === 'earpiece' && cachedDevices.earpiece) {
-                return cachedDevices.earpiece.deviceId;
-            }
-            if (currentRoute === 'speaker' && cachedDevices.speaker) {
-                return cachedDevices.speaker.deviceId;
-            }
-            return "";
-        }
-
-        function applySinkToAllAudio() {
-            const targetId = getTargetDeviceId();
+        // CRITICAL ENGINE: MOBILE ANDROID HARDWARE AUDIO SWITCH
+        async function applyHardwareRouting() {
             const audios = document.querySelectorAll('#remote-audio-container audio');
+            const ctx = getAudioContext();
 
-            Promise.all(Array.from(audios).map(audioEl => {
-                if (audioEl.setSinkId) {
-                    return audioEl.setSinkId(targetId).catch(() => {
-                        return audioEl.setSinkId("").catch(() => {});
-                    });
+            // 1. LiveKit Official Hardware Switch (agar support karta ho)
+            if (room && room.switchActiveDevice) {
+                let targetId = "default";
+                if (currentRoute === 'bluetooth' && cachedDevices.bluetooth) {
+                    targetId = cachedDevices.bluetooth.deviceId;
+                } else if (currentRoute === 'earpiece' && cachedDevices.earpiece) {
+                    targetId = cachedDevices.earpiece.deviceId;
+                } else if (cachedDevices.speaker) {
+                    targetId = cachedDevices.speaker.deviceId;
                 }
-                return Promise.resolve();
-            })).catch(() => {});
+                try {
+                    await room.switchActiveDevice('audiooutput', targetId);
+                } catch(e) {}
+            }
+
+            // 2. Direct HTML5 Elements Sink Routing
+            for (const a of audios) {
+                if (currentRoute === 'speaker') {
+                    // Force Loudspeaker: Clear sink and play via standard media stream
+                    if (a.setSinkId) {
+                        try {
+                            const spkId = cachedDevices.speaker ? cachedDevices.speaker.deviceId : "default";
+                            await a.setSinkId(spkId);
+                        } catch(e) {
+                            a.setSinkId("").catch(() => {});
+                        }
+                    }
+                } else if (currentRoute === 'bluetooth' && cachedDevices.bluetooth) {
+                    if (a.setSinkId) {
+                        try {
+                            await a.setSinkId(cachedDevices.bluetooth.deviceId);
+                        } catch(e) {}
+                    }
+                } else if (currentRoute === 'earpiece' && cachedDevices.earpiece) {
+                    if (a.setSinkId) {
+                        try {
+                            await a.setSinkId(cachedDevices.earpiece.deviceId);
+                        } catch(e) {}
+                    }
+                }
+            }
         }
 
         if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
@@ -412,10 +443,7 @@
 
                         document.getElementById('remote-audio-container').appendChild(audioEl);
                         
-                        const targetId = getTargetDeviceId();
-                        if (audioEl.setSinkId && targetId) {
-                            audioEl.setSinkId(targetId).catch(() => {});
-                        }
+                        applyHardwareRouting();
                         audioEl.play().catch(() => {});
                     }
                 });
@@ -437,7 +465,6 @@
                             if (msg.targetId === myId) {
                                 if (msg.state.is_muted) {
                                     amIHardLocked = true;
-                                    // Hardware leak-proof cutoff
                                     if (localAudioTrack) {
                                         await localAudioTrack.mute();
                                         if (localAudioTrack.mediaStreamTrack) {
@@ -464,7 +491,7 @@
                 });
 
                 await room.connect(data.livekit_url, data.token);
-                refreshAudioDevices();
+                await refreshAudioDevices();
 
                 document.getElementById('connection-state').innerText = "Connected";
                 document.getElementById('status-dot').className = "w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0";
@@ -476,7 +503,7 @@
             }
         }
 
-        // LEAK-PROOF HARDWARE MUTE / UNMUTE
+        // HARDWARE LEAK-PROOF MIC TOGGLE
         async function toggleMic() {
             if (!room) return;
             if (amIHardLocked) {
@@ -500,7 +527,7 @@
                     }
                     updateMicUI();
                     
-                    // Unlocking hardware labels to detect Bluetooth on phone
+                    // Microphone allow hote hi phone ke actual hardware names unlock ho jaate hain
                     await refreshAudioDevices();
                     return;
                 } catch (err) {
@@ -510,14 +537,14 @@
             }
 
             if (isMuted) {
-                // UNMUTE: Hardware & Software both open
+                // UNMUTE
                 if (localAudioTrack.mediaStreamTrack) {
                     localAudioTrack.mediaStreamTrack.enabled = true;
                 }
                 await localAudioTrack.unmute();
                 isMuted = false;
             } else {
-                // MUTE: DUAL KILL - LiveKit mute + Raw Hardware Track Disable (0% leak)
+                // MUTE: LiveKit Mute + Raw Hardware Track Disable (0% leak)
                 if (localAudioTrack.mediaStreamTrack) {
                     localAudioTrack.mediaStreamTrack.enabled = false;
                 }
@@ -546,7 +573,7 @@
                 btn.classList.remove('mic-speaking-glow');
             } else {
                 btn.className = "w-16 h-16 rounded-full bg-gradient-to-tr from-emerald-500 to-emerald-400 text-white flex items-center justify-center shadow-lg shadow-emerald-500/35 active:scale-95 transition relative border-2 border-white/40 dark:border-white/20";
-                icon.innerHTML = `<path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>`;
+                icon.innerHTML = `<path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>`;
                 label.innerText = "You're Live";
 
                 if (isSpeakingNow) {
