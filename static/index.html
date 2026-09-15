@@ -6,70 +6,44 @@
     <title>Voice Space</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = { darkMode: 'class' };
-    </script>
+    <script>tailwind.config = { darkMode: 'class' };</script>
     <script src="https://cdn.jsdelivr.net/npm/livekit-client@2.5.9/dist/livekit-client.umd.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         * { font-family: 'Plus Jakarta Sans', -apple-system, sans-serif; transition: background-color 0.2s ease, color 0.2s ease; }
-        
-        html.dark body { background: #0e121a; color: #f8fafc; }
+        html.dark body { background: #0c1017; color: #f8fafc; }
         html.light body { background: #f1f5f9; color: #0f172a; }
 
-        .speaking {
-            border-color: #38bdf8 !important;
-            box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.4), 0 0 20px rgba(56, 189, 248, 0.5) !important;
-        }
+        .glass-panel { backdrop-filter: blur(16px); }
+        html.dark .glass-panel { background: rgba(20, 26, 38, 0.88); border: 1px solid rgba(255, 255, 255, 0.07); }
+        html.light .glass-panel { background: rgba(255, 255, 255, 0.9); border: 1px solid rgba(0, 0, 0, 0.08); }
 
-        html.dark .glass-panel {
-            background: rgba(26, 34, 48, 0.85);
-            backdrop-filter: blur(16px);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-        }
-        html.light .glass-panel {
-            background: rgba(255, 255, 255, 0.9);
-            backdrop-filter: blur(16px);
-            border: 1px solid rgba(0, 0, 0, 0.08);
-        }
+        .glass-pill { backdrop-filter: blur(8px); }
+        html.dark .glass-pill { background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.08); }
+        html.light .glass-pill { background: rgba(0, 0, 0, 0.04); border: 1px solid rgba(0, 0, 0, 0.06); }
 
-        html.dark .glass-pill {
-            background: rgba(255, 255, 255, 0.06);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-        }
-        html.light .glass-pill {
-            background: rgba(0, 0, 0, 0.04);
-            border: 1px solid rgba(0, 0, 0, 0.06);
-        }
-
+        /* Telegram Floating Messages */
         .tg-floating-pill {
             animation: slideUpPill 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-            background: rgba(27, 34, 47, 0.92);
+            background: rgba(22, 28, 38, 0.95);
             backdrop-filter: blur(12px);
             border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
         }
-        html.light .tg-floating-pill {
-            background: rgba(255, 255, 255, 0.95);
-            border: 1px solid rgba(0, 0, 0, 0.08);
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+        @keyframes slideUpPill { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* TELEGRAM NATIVE AUDIO GLOW AROUND HERO MIC */
+        .mic-halo-glow {
+            box-shadow: 0 0 0 8px rgba(34, 197, 94, 0.25), 0 0 25px 8px rgba(34, 197, 94, 0.45);
+            animation: pulseGlow 1.4s ease-in-out infinite alternate;
+        }
+        @keyframes pulseGlow {
+            0% { box-shadow: 0 0 0 6px rgba(34, 197, 94, 0.2), 0 0 15px 4px rgba(34, 197, 94, 0.35); }
+            100% { box-shadow: 0 0 0 14px rgba(34, 197, 94, 0.35), 0 0 32px 14px rgba(34, 197, 94, 0.6); }
         }
 
-        @keyframes slideUpPill {
-            from { opacity: 0; transform: translateY(10px) scale(0.95); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .tg-pill-exit {
-            animation: fadeOutPill 0.35s ease-out forwards;
-        }
-        @keyframes fadeOutPill {
-            from { opacity: 1; transform: scale(1); }
-            to { opacity: 0; transform: scale(0.9); height: 0; margin: 0; padding: 0; }
-        }
-
-        /* Custom Volume Slider */
-        input[type=range] {
-            accent-color: #6366f1;
+        .speaking-border {
+            border-color: #22c55e !important;
+            box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.4), 0 0 15px rgba(34, 197, 94, 0.4) !important;
         }
     </style>
 </head>
@@ -77,7 +51,7 @@
 
     <div id="remote-audio-container" class="hidden"></div>
 
-    <!-- Top Status Header -->
+    <!-- Top Header Bar -->
     <header class="glass-panel p-3.5 rounded-2xl flex items-center justify-between shadow-xl relative z-10">
         <div class="flex items-center gap-3 overflow-hidden">
             <span id="status-dot" class="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0 animate-pulse"></span>
@@ -86,199 +60,174 @@
                 <span class="text-[10px] dark:text-slate-400 text-slate-500" id="connection-state">Connecting...</span>
             </div>
         </div>
-        
         <div class="flex items-center gap-2">
             <div class="glass-pill px-3 py-1.5 rounded-xl text-xs font-semibold dark:text-slate-300 text-slate-700 flex items-center gap-1.5">
                 <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
                 <span id="participant-count">0</span> Online
             </div>
-
-            <button onclick="toggleTheme()" class="glass-pill p-2 rounded-xl dark:text-amber-300 text-slate-700 active:scale-90 transition">
-                <svg id="theme-icon-sun" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
-                <svg id="theme-icon-moon" class="w-4 h-4 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
-            </button>
+            <button onclick="toggleTheme()" class="glass-pill p-2 rounded-xl text-amber-400">☀️</button>
         </div>
     </header>
 
-    <!-- Center Stage: Participant Grid -->
+    <!-- Center Stage: Participants Grid -->
     <main class="flex-1 flex flex-col items-center justify-start pt-6 relative z-10 overflow-hidden">
         <div id="grid" class="w-full h-full max-h-[46vh] grid grid-cols-3 gap-y-6 gap-x-4 auto-rows-max overflow-y-auto px-2 items-start justify-center"></div>
     </main>
 
-    <!-- Telegram-Style Floating Messages -->
-    <div id="live-chat-overlay" class="absolute bottom-24 left-4 right-4 z-20 flex flex-col items-center justify-end space-y-2 pointer-events-none max-h-44 overflow-hidden"></div>
+    <!-- Live Floating Text Messages -->
+    <div id="live-chat-overlay" class="absolute bottom-28 left-4 right-4 z-20 flex flex-col items-center justify-end space-y-2 pointer-events-none max-h-44 overflow-hidden"></div>
 
-    <!-- Inline Quick Chat Input -->
-    <div id="chat-input-bar" class="hidden absolute bottom-24 left-4 right-4 z-30 pointer-events-auto">
+    <!-- Inline Quick Chat Input Box -->
+    <div id="chat-input-bar" class="hidden absolute bottom-28 left-4 right-4 z-30 pointer-events-auto">
         <form onsubmit="handleSendChat(event)" class="glass-panel p-2 rounded-2xl flex gap-2 shadow-2xl">
-            <input id="chat-input" type="text" placeholder="Type a message into voice chat..." autocomplete="off" class="flex-1 px-4 py-2.5 rounded-xl dark:bg-slate-900/80 bg-white/90 border dark:border-white/10 border-slate-300 dark:text-white text-slate-900 text-xs outline-none focus:border-indigo-500 transition">
-            <button type="submit" class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold active:scale-95 transition">Send</button>
-            <button type="button" onclick="toggleChatInput()" class="p-2 dark:text-slate-400 text-slate-600 rounded-xl">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-            </button>
+            <input id="chat-input" type="text" placeholder="Type a message into voice chat..." autocomplete="off" class="flex-1 px-4 py-2.5 rounded-xl dark:bg-slate-900 bg-white border border-white/10 dark:text-white text-slate-900 text-xs outline-none">
+            <button type="submit" class="px-4 py-2.5 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-semibold active:scale-95 transition">Send</button>
         </form>
     </div>
 
     <!-- Error Banner -->
-    <div id="error-banner" class="hidden glass-pill bg-rose-500/20 border-rose-500/40 text-rose-500 dark:text-rose-300 text-xs px-4 py-2 rounded-xl text-center mb-2 relative z-10 mx-auto max-w-xs shadow-lg"></div>
+    <div id="error-banner" class="hidden glass-pill bg-rose-500/20 text-rose-400 text-xs px-4 py-2 rounded-xl text-center mb-2 relative z-10 mx-auto max-w-xs shadow-lg"></div>
 
-    <!-- Bottom Dock Controls -->
-    <footer class="glass-panel px-5 py-3 rounded-full max-w-sm mx-auto w-full flex items-center justify-between shadow-2xl relative z-10 mb-2 border border-white/10">
-        <button onclick="leaveSpace()" class="w-11 h-11 rounded-full bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/25 text-rose-500 flex items-center justify-center active:scale-90 transition">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 8l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M5 3a2 2 0 00-2 2v1c0 8.284 6.716 15 15 15h1a2 2 0 002-2v-3.28a1 1 0 00-.684-.948l-4.493-1.498a1 1 0 00-1.21.502l-1.13 2.257a11.042 11.042 0 01-5.516-5.517l2.257-1.128a1 1 0 00.502-1.21L9.228 3.683A1 1 0 008.279 3H5z"/></svg>
-        </button>
+    <!-- NATIVE TELEGRAM DOCK CONTROLS (Bluetooth/Speaker | Mic Glow | Message | Leave) -->
+    <footer class="w-full max-w-sm mx-auto flex items-end justify-between px-4 pb-2 relative z-10">
+        
+        <!-- 1. Speaker / Output -->
+        <div class="flex flex-col items-center gap-1">
+            <button id="spk-btn" onclick="toggleAudioOutput()" class="w-13 h-13 p-3 rounded-full bg-[#38bdf8] text-white flex items-center justify-center shadow-lg active:scale-90 transition">
+                <svg id="icon-speaker" class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M7 9v6h4l5 5V4L11 9H7z"/>
+                </svg>
+                <svg id="icon-bluetooth" class="w-6 h-6 hidden" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M17.71 7.71L12 2h-1v7.59L6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 11 14.41V22h1l5.71-5.71-4.3-4.29 4.3-4.29zM13 5.83l1.88 1.88L13 9.59V5.83zm1.88 10.46L13 18.17v-3.76l1.88 1.88z"/>
+                </svg>
+            </button>
+            <span id="output-label" class="text-[11px] font-medium text-slate-300">Speaker</span>
+        </div>
 
-        <button id="mic-btn" onclick="toggleMic()" class="w-14 h-14 rounded-full bg-rose-600 text-white flex items-center justify-center shadow-lg active:scale-95 transition border-2 border-white/20">
-            <svg id="mic-icon" class="w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 02-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/>
-                <line x1="2" y1="2" x2="22" y2="22" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            </svg>
-        </button>
+        <!-- 2. Hero Center Mic (Speaking Reactive Green Glow & Label) -->
+        <div class="flex flex-col items-center gap-1.5 -mb-1">
+            <button id="mic-btn" onclick="toggleMic()" class="w-18 h-18 rounded-full bg-sky-500 text-white flex items-center justify-center shadow-xl active:scale-95 transition relative">
+                <svg id="mic-icon" class="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+                    <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+                </svg>
+            </button>
+            <span id="mic-status-label" class="text-[12px] font-semibold text-slate-200">Unmute</span>
+        </div>
 
-        <button id="chat-btn" onclick="toggleChatInput()" class="w-11 h-11 rounded-full dark:bg-indigo-600/30 bg-indigo-500/15 border border-indigo-400/30 text-indigo-500 dark:text-indigo-300 flex items-center justify-center active:scale-90 transition">
-            <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
-        </button>
+        <!-- 3. Message Button -->
+        <div class="flex flex-col items-center gap-1">
+            <button onclick="toggleChatInput()" class="w-13 h-13 p-3 rounded-full bg-[#10b981] text-white flex items-center justify-center shadow-lg active:scale-90 transition">
+                <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/>
+                </svg>
+            </button>
+            <span class="text-[11px] font-medium text-slate-300">Message</span>
+        </div>
 
-        <button id="spk-btn" onclick="toggleAudioOutput()" class="w-11 h-11 rounded-full dark:bg-slate-700/40 bg-slate-200 border dark:border-white/10 border-slate-300 dark:text-slate-200 text-slate-700 flex items-center justify-center active:scale-90 transition" title="Audio Output">
-            <svg id="icon-speaker" class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/>
-            </svg>
-            <svg id="icon-bluetooth" class="w-5 h-5 shrink-0 hidden text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7l10 10-5 5V2l5 5L7 17"/>
-            </svg>
-        </button>
+        <!-- 4. Leave Button -->
+        <div class="flex flex-col items-center gap-1">
+            <button onclick="leaveSpace()" class="w-13 h-13 p-3 rounded-full bg-[#ef4444] text-white flex items-center justify-center shadow-lg active:scale-90 transition">
+                <svg class="w-6 h-6 rotate-135" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 9c-1.6 0-3.15.25-4.6.72v3.1c0 .39-.23.74-.56.9-.98.49-1.87 1.12-2.66 1.85-.18.18-.43.28-.7.28-.28 0-.53-.11-.71-.29L.29 13.08c-.18-.17-.29-.42-.29-.7 0-.28.11-.53.29-.71C3.34 8.78 7.46 7 12 7s8.66 1.78 11.71 4.67c.18.18.29.43.29.71 0 .28-.11.53-.29.71l-2.48 2.48c-.18.18-.43.29-.71.29-.27 0-.52-.11-.7-.28-.79-.74-1.69-1.36-2.67-1.85-.33-.16-.56-.5-.56-.9v-3.1C15.15 9.25 13.6 9 12 9z"/>
+                </svg>
+            </button>
+            <span class="text-[11px] font-medium text-slate-300">Leave</span>
+        </div>
+
     </footer>
 
-    <!-- User Profile & Dual Volume Modal -->
+    <!-- User Profile & Action Modal -->
     <div id="profile-modal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-        <div class="glass-panel p-5 rounded-3xl max-w-xs w-full text-center space-y-4 shadow-2xl relative">
-            <div id="modal-avatar" class="w-16 h-16 rounded-full mx-auto overflow-hidden border-2 border-indigo-500 shadow-md"></div>
+        <div class="glass-panel p-5 rounded-3xl max-w-xs w-full text-center space-y-4 shadow-2xl">
+            <div id="modal-avatar" class="w-16 h-16 rounded-full mx-auto overflow-hidden border-2 border-indigo-500"></div>
             <div>
-                <h3 id="modal-name" class="font-bold text-sm dark:text-white text-slate-900"></h3>
+                <h3 id="modal-name" class="font-bold text-sm"></h3>
                 <span id="modal-role" class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full inline-block mt-1"></span>
             </div>
 
-            <!-- Volume Slider Section -->
-            <div id="modal-volume-box" class="space-y-2 pt-2 border-t dark:border-white/10 border-slate-200 text-left">
+            <!-- Volume Slider -->
+            <div id="modal-volume-box" class="space-y-2 pt-2 border-t border-white/10 text-left">
                 <div class="flex justify-between items-center text-xs">
-                    <span class="text-slate-400 font-medium">Volume</span>
-                    <span id="volume-val-display" class="font-bold dark:text-white text-slate-900">100%</span>
+                    <span class="text-slate-400">Volume</span>
+                    <span id="volume-val-display" class="font-bold">100%</span>
                 </div>
-                <input id="user-volume-slider" type="range" min="0" max="200" value="100" class="w-full h-1.5 bg-slate-700 rounded-lg cursor-pointer">
-
-                <div id="admin-global-vol-wrap" class="hidden pt-1 flex items-center gap-2">
-                    <input type="checkbox" id="chk-global-volume" class="rounded text-indigo-600 focus:ring-0">
-                    <label for="chk-global-volume" class="text-[11px] text-indigo-400 font-semibold cursor-pointer">Set volume for everyone</label>
-                </div>
+                <input id="user-volume-slider" type="range" min="0" max="200" value="100" class="w-full h-1.5 bg-slate-700 rounded-lg">
             </div>
 
-            <!-- Admin / Owner Moderation Actions -->
-            <div id="modal-actions" class="hidden space-y-2 pt-2 border-t dark:border-white/10 border-slate-200">
+            <!-- Moderation Controls -->
+            <div id="modal-actions" class="hidden space-y-2 pt-2 border-t border-white/10">
+                <div id="owner-opt-allow-admin" class="hidden text-left flex items-center gap-2 pb-1">
+                    <input type="checkbox" id="chk-allow-admin" class="rounded text-indigo-600">
+                    <label for="chk-allow-admin" class="text-[11px] text-amber-300 font-medium">Allow Admins to Unmute</label>
+                </div>
+
                 <div class="grid grid-cols-2 gap-2">
-                    <button id="btn-mod-mute" class="py-2 px-3 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 rounded-xl text-xs font-semibold active:scale-95 transition">Lock Mic</button>
-                    <button id="btn-mod-kick" class="py-2 px-3 bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 rounded-xl text-xs font-semibold active:scale-95 transition">Remove</button>
+                    <button id="btn-mod-mute" class="py-2 px-3 rounded-xl text-xs font-semibold">Lock Mic</button>
+                    <button id="btn-mod-kick" class="py-2 px-3 bg-rose-500/20 text-rose-400 rounded-xl text-xs font-semibold">Remove</button>
                 </div>
             </div>
 
-            <button onclick="closeProfileModal()" class="w-full py-2 text-xs text-slate-400 hover:text-slate-200 transition">Close</button>
+            <button onclick="closeProfileModal()" class="w-full py-1 text-xs text-slate-400">Close</button>
         </div>
     </div>
 
     <script>
         const tg = window.Telegram?.WebApp;
-        if (tg) {
-            try {
-                tg.ready();
-                tg.expand();
-            } catch(e) {}
-        }
-
-        function setTheme(theme) {
-            const html = document.getElementById('html-root');
-            const sunIcon = document.getElementById('theme-icon-sun');
-            const moonIcon = document.getElementById('theme-icon-moon');
-
-            if (theme === 'light') {
-                html.classList.remove('dark');
-                html.classList.add('light');
-                if (sunIcon) sunIcon.classList.add('hidden');
-                if (moonIcon) moonIcon.classList.remove('hidden');
-            } else {
-                html.classList.remove('light');
-                html.classList.add('dark');
-                if (sunIcon) sunIcon.classList.remove('hidden');
-                if (moonIcon) moonIcon.classList.add('hidden');
-            }
-        }
-
-        function toggleTheme() {
-            const html = document.getElementById('html-root');
-            const current = html.classList.contains('dark') ? 'light' : 'dark';
-            setTheme(current);
-            try { localStorage.setItem('theme_pref', current); } catch(e) {}
-        }
+        if (tg) { try { tg.ready(); tg.expand(); } catch(e) {} }
 
         let room = null;
         let isMuted = true;
-        let isSpeakerOn = true;
+        let isSpeakingNow = false;
         let myPhotoUrl = "";
         let localAudioTrack = null;
-        let bluetoothDeviceId = null;
-        let currentSinkId = "default";
+        let micInitialized = false;
 
         let currentChatId = "";
         let amIBotOwner = false;
         let amIGroupAdmin = false;
-        let selectedParticipantId = null;
+        let amIHardLocked = false;
+        let participantStates = {};
 
-        const MAX_MESSAGES = 8;
-        const MESSAGE_LIFETIME = 45000;
+        let bluetoothDeviceId = null;
+        let currentSinkId = "default";
+        let isSpeakerOn = true;
 
         function showError(msg) {
             const el = document.getElementById('error-banner');
             el.innerText = msg;
             el.classList.remove('hidden');
-            document.getElementById('connection-state').innerText = "Notice";
-            document.getElementById('status-dot').className = "w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0";
         }
 
-        function getLiveKit() {
-            return window.LivekitClient || window.livekit || window.LiveKit;
-        }
+        function getLiveKit() { return window.LivekitClient || window.livekit || window.LiveKit; }
 
         function resumeAudioContext() {
-            const audios = document.querySelectorAll('audio');
-            audios.forEach(a => {
-                if (a.paused && a.srcObject) {
-                    a.play().catch(() => {});
-                }
-            });
+            document.querySelectorAll('audio').forEach(a => { if (a.paused && a.srcObject) a.play().catch(() => {}); });
         }
 
         async function detectAudioDevices() {
             if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
             try {
                 const devices = await navigator.mediaDevices.enumerateDevices();
-                const audioOutputs = devices.filter(d => d.kind === 'audiooutput' || d.kind === 'audioinput');
-                
-                const bt = audioOutputs.find(d => 
-                    d.label.toLowerCase().includes('bluetooth') || 
-                    d.label.toLowerCase().includes('wireless') || 
-                    d.label.toLowerCase().includes('airpods') ||
-                    d.label.toLowerCase().includes('buds')
+                const bt = devices.find(d => 
+                    (d.kind === 'audiooutput' || d.kind === 'audioinput') &&
+                    (d.label.toLowerCase().includes('bluetooth') || d.label.toLowerCase().includes('airpods') || d.label.toLowerCase().includes('buds'))
                 );
 
                 const spkIcon = document.getElementById('icon-speaker');
                 const btIcon = document.getElementById('icon-bluetooth');
+                const outLabel = document.getElementById('output-label');
 
                 if (bt) {
                     bluetoothDeviceId = bt.deviceId;
                     btIcon.classList.remove('hidden');
                     spkIcon.classList.add('hidden');
+                    outLabel.innerText = "Bluetooth";
                 } else {
                     bluetoothDeviceId = null;
                     btIcon.classList.add('hidden');
                     spkIcon.classList.remove('hidden');
+                    outLabel.innerText = "Speaker";
                 }
             } catch(e) {}
         }
@@ -286,376 +235,161 @@
         async function startVoiceSession() {
             const urlParams = new URLSearchParams(window.location.search);
             currentChatId = tg?.initDataUnsafe?.start_param || urlParams.get('tgWebAppStartParam') || urlParams.get('chat_id') || "";
-
             if (!currentChatId) return showError("Session parameter missing.");
 
             const LK = getLiveKit();
             if (!LK) return showError("Audio SDK load failed.");
 
             try {
-                document.getElementById('connection-state').innerText = "Authenticating...";
-
                 const res = await fetch('/api/get-token', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        chat_id: currentChatId,
-                        init_data: tg?.initData || ""
-                    })
+                    body: JSON.stringify({ chat_id: currentChatId, init_data: tg?.initData || "" })
                 });
 
-                if (!res.ok) {
-                    const err = await res.json();
-                    throw new Error(err.detail || "Authentication Failed");
-                }
-
                 const data = await res.json();
-                document.getElementById('group-title').innerText = data.group_title || "Voice Space";
-                document.getElementById('connection-state').innerText = "Connecting...";
+                if (!res.ok) throw new Error(data.detail || "Authentication Failed");
 
+                document.getElementById('group-title').innerText = data.group_title || "Voice Space";
                 amIBotOwner = data.is_owner || false;
                 amIGroupAdmin = data.is_admin || false;
-
-                try {
-                    const parsedUser = tg?.initDataUnsafe?.user;
-                    if (parsedUser && parsedUser.photo_url) myPhotoUrl = parsedUser.photo_url;
-                } catch(e) {}
+                amIHardLocked = data.is_muted || false;
 
                 room = new LK.Room({
-                    adaptiveStream: false,
-                    dynacast: false,
-                    audioCaptureDefaults: {
-                        echoCancellation: true,
-                        noiseSuppression: true,
-                        autoGainControl: true,
-                        highpassFilter: true
-                    },
+                    audioCaptureDefaults: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
                     publishDefaults: { dtx: false, red: true }
                 });
 
-                room.on(LK.RoomEvent.Disconnected, (reason) => {
-                    const isRoomEnded = (reason === LK.DisconnectReason?.ROOM_DELETED || reason === 2);
-                    
-                    if (isRoomEnded) {
-                        showError("Voice Space has been ended by Admin.");
-                    } else {
-                        showError("You were disconnected from the space.");
-                    }
-
-                    setTimeout(() => {
-                        if (tg && tg.close) tg.close();
-                        else window.close();
-                    }, 1200);
+                room.on(LK.RoomEvent.Disconnected, () => {
+                    alert("Voice Space session ended.");
+                    if (tg && tg.close) tg.close(); else window.close();
                 });
 
-                room.on(LK.RoomEvent.TrackSubscribed, (track, publication, participant) => {
+                room.on(LK.RoomEvent.TrackSubscribed, (track, pub, p) => {
                     if (track.kind === LK.Track.Kind.Audio) {
-                        const container = document.getElementById('remote-audio-container');
                         const audioEl = track.attach();
-                        audioEl.id = `audio-${participant.identity}`;
-                        audioEl.autoplay = true;
-                        audioEl.playsinline = true;
-                        container.appendChild(audioEl);
-
-                        if (currentSinkId && audioEl.setSinkId) {
-                            audioEl.setSinkId(currentSinkId).catch(() => {});
-                        }
+                        audioEl.id = `audio-${p.identity}`;
+                        document.getElementById('remote-audio-container').appendChild(audioEl);
+                        if (currentSinkId && audioEl.setSinkId) audioEl.setSinkId(currentSinkId).catch(() => {});
                         audioEl.play().catch(() => {});
                     }
                 });
 
-                room.on(LK.RoomEvent.TrackUnsubscribed, (track) => {
-                    track.detach().forEach(el => el.remove());
-                });
-
+                room.on(LK.RoomEvent.TrackUnsubscribed, track => track.detach().forEach(el => el.remove()));
                 room.on(LK.RoomEvent.ParticipantConnected, renderUsers);
                 room.on(LK.RoomEvent.ParticipantDisconnected, renderUsers);
                 room.on(LK.RoomEvent.ActiveSpeakersChanged, handleSpeakers);
 
-                // REAL-TIME SIGNAL DISPATCHER (Step 2 Integration)
                 room.on(LK.RoomEvent.DataReceived, async (payload) => {
                     try {
-                        const msgObj = JSON.parse(new TextDecoder().decode(payload));
-                        
-                        if (msgObj.type === "ADMIN_LOCK_MIC") {
-                            if (msgObj.targetId === String(room.localParticipant.identity)) {
-                                if (localAudioTrack) {
-                                    await localAudioTrack.mute();
+                        const msg = JSON.parse(new TextDecoder().decode(payload));
+                        const myId = String(room.localParticipant.identity);
+
+                        if (msg.type === "MOD_STATE_CHANGE") {
+                            participantStates[msg.targetId] = msg.state;
+                            renderUsers();
+
+                            if (msg.targetId === myId) {
+                                if (msg.state.is_muted) {
+                                    amIHardLocked = true;
+                                    if (localAudioTrack) await localAudioTrack.mute();
+                                    isMuted = true;
+                                    isSpeakingNow = false;
+                                    updateMicUI();
+                                    alert(msg.state.by_owner ? "Bot Owner has locked your microphone." : "Group Admin has locked your microphone.");
+                                } else {
+                                    amIHardLocked = false;
+                                    alert("Your microphone has been unlocked. You can unmute now.");
                                 }
-                                isMuted = true;
-                                updateMicUI();
-                                alert("An Administrator has locked your microphone.");
                             }
-                        }
-                        else if (msgObj.type === "ADMIN_KICK") {
-                            if (msgObj.targetId === String(room.localParticipant.identity)) {
-                                alert("You have been removed from the Voice Space by Admin.");
-                                leaveSpace();
-                            }
-                        }
-                        else if (msgObj.type === "GLOBAL_VOLUME_ADJUST") {
-                            applyAudioVolumeLocally(msgObj.targetId, msgObj.volume);
-                        } 
-                        else {
-                            displayFloatingMessage(msgObj.name, msgObj.photo_url, msgObj.text);
+                        } else if (msg.type === "MOD_KICK" && msg.targetId === myId) {
+                            alert("You have been removed from the space.");
+                            leaveSpace();
+                        } else if (msg.type === "CHAT") {
+                            displayFloatingMessage(msg.name, msg.photo_url, msg.text);
                         }
                     } catch(e) {}
                 });
 
                 await room.connect(data.livekit_url, data.token);
 
+                await initMicrophoneOnce();
+                await detectAudioDevices();
+
                 document.getElementById('connection-state').innerText = "Connected";
                 document.getElementById('status-dot').className = "w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0";
-
-                await detectAudioDevices();
                 updateMicUI();
                 renderUsers();
+
             } catch (err) {
-                console.error(err);
                 showError(err.message || "Connection failed");
             }
         }
 
-        function renderUsers() {
-            if (!room) return;
-            const grid = document.getElementById('grid');
-            grid.innerHTML = "";
-
-            const participants = [room.localParticipant, ...Array.from(room.remoteParticipants.values())];
-            document.getElementById('participant-count').innerText = participants.length;
-
-            participants.forEach(p => {
-                let meta = {};
-                try { meta = JSON.parse(p.metadata || "{}"); } catch(e) {}
-
-                if (p === room.localParticipant && meta.photo_url) myPhotoUrl = meta.photo_url;
-
-                const card = document.createElement('div');
-                card.className = "flex flex-col items-center gap-1.5 cursor-pointer active:scale-95 transition";
-                card.onclick = () => openProfileModal(p, meta);
-
-                const bubble = document.createElement('div');
-                bubble.id = `user-${p.identity}`;
-                bubble.className = `relative w-16 h-16 rounded-full border-2 ${meta.is_owner ? 'border-amber-400 shadow-md shadow-amber-400/20' : (meta.is_admin ? 'border-sky-400' : 'dark:border-white/10 border-slate-300')} flex items-center justify-center dark:bg-slate-800 bg-white overflow-hidden shadow-lg`;
-
-                if (meta.photo_url) {
-                    bubble.innerHTML = `<img src="${meta.photo_url}" class="w-full h-full object-cover">`;
-                } else {
-                    const initials = (p.name || "U").slice(0, 1).toUpperCase();
-                    bubble.innerHTML = `<span class="font-bold text-base bg-gradient-to-tr from-pink-400 to-indigo-500 bg-clip-text text-transparent">${initials}</span>`;
-                }
-
-                if (meta.is_owner) {
-                    const badge = document.createElement('span');
-                    badge.className = "absolute top-0 right-0 text-[10px] bg-amber-400 text-slate-900 rounded-full px-1 font-bold";
-                    badge.innerText = "★";
-                    bubble.appendChild(badge);
-                } else if (meta.is_admin) {
-                    const badge = document.createElement('span');
-                    badge.className = "absolute top-0 right-0 text-[10px] bg-sky-400 text-slate-900 rounded-full px-1 font-bold";
-                    badge.innerText = "🛡";
-                    bubble.appendChild(badge);
-                }
-
-                const label = document.createElement('span');
-                label.className = "text-[11px] dark:text-slate-300 text-slate-700 font-semibold truncate max-w-[75px] text-center";
-                label.innerText = p.name || `User ${p.identity}`;
-
-                card.appendChild(bubble);
-                card.appendChild(label);
-                grid.appendChild(card);
-            });
-        }
-
-        function openProfileModal(participant, meta) {
-            selectedParticipantId = participant.identity;
-            const isSelf = participant.identity === room?.localParticipant?.identity;
-            document.getElementById('modal-name').innerText = participant.name || "User";
-
-            const avatarBox = document.getElementById('modal-avatar');
-            if (meta.photo_url) {
-                avatarBox.innerHTML = `<img src="${meta.photo_url}" class="w-full h-full object-cover">`;
-            } else {
-                const initials = (participant.name || "U")[0].toUpperCase();
-                avatarBox.innerHTML = `<div class="w-full h-full bg-slate-700 text-white flex items-center justify-center font-bold text-lg">${initials}</div>`;
-            }
-
-            const roleEl = document.getElementById('modal-role');
-            if (meta.is_owner) {
-                roleEl.innerText = "Bot Owner";
-                roleEl.className = "text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full inline-block mt-1 bg-amber-400/20 text-amber-400";
-            } else if (meta.is_admin) {
-                roleEl.innerText = "Group Admin";
-                roleEl.className = "text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full inline-block mt-1 bg-sky-400/20 text-sky-400";
-            } else {
-                roleEl.innerText = "Member";
-                roleEl.className = "text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full inline-block mt-1 bg-slate-500/20 text-slate-400";
-            }
-
-            const volBox = document.getElementById('modal-volume-box');
-            const globalVolWrap = document.getElementById('admin-global-vol-wrap');
-            if (!isSelf) {
-                volBox.classList.remove('hidden');
-                
-                if (amIBotOwner || amIGroupAdmin) {
-                    globalVolWrap.classList.remove('hidden');
-                    document.getElementById('chk-global-volume').checked = false;
-                } else {
-                    globalVolWrap.classList.add('hidden');
-                }
-
-                const slider = document.getElementById('user-volume-slider');
-                slider.oninput = (e) => handleVolumeChange(participant.identity, e.target.value);
-            } else {
-                volBox.classList.add('hidden');
-            }
-
-            const targetIsOwner = meta.is_owner || false;
-            const targetIsAdmin = meta.is_admin || false;
-            let canModerate = false;
-
-            if (!isSelf) {
-                if (amIBotOwner && !targetIsOwner) canModerate = true;
-                else if (amIGroupAdmin && !targetIsOwner && !targetIsAdmin) canModerate = true;
-            }
-
-            const actionsBox = document.getElementById('modal-actions');
-            if (canModerate) {
-                actionsBox.classList.remove('hidden');
-                document.getElementById('btn-mod-mute').onclick = () => moderateUserAction(participant.identity, 'mute');
-                document.getElementById('btn-mod-kick').onclick = () => moderateUserAction(participant.identity, 'kick');
-            } else {
-                actionsBox.classList.add('hidden');
-            }
-
-            document.getElementById('profile-modal').classList.remove('hidden');
-        }
-
-        function closeProfileModal() {
-            document.getElementById('profile-modal').classList.add('hidden');
-            selectedParticipantId = null;
-        }
-
-        function applyAudioVolumeLocally(targetIdentity, volPercent) {
-            const floatVal = volPercent / 100.0;
-            const audioEl = document.getElementById(`audio-${targetIdentity}`);
-            if (audioEl) {
-                audioEl.volume = Math.min(Math.max(floatVal, 0), 1.0);
-            }
-            if (room) {
-                const p = room.remoteParticipants.get(targetIdentity);
-                if (p) {
-                    p.audioTrackPublications.forEach(pub => {
-                        if (pub.track) pub.track.setVolume(floatVal);
-                    });
-                }
-            }
-        }
-
-        function handleVolumeChange(targetIdentity, value) {
-            document.getElementById('volume-val-display').innerText = `${value}%`;
-            applyAudioVolumeLocally(targetIdentity, value);
-
-            const isGlobal = document.getElementById('chk-global-volume').checked;
-            if (isGlobal && (amIBotOwner || amIGroupAdmin) && room) {
-                const payload = JSON.stringify({
-                    type: "GLOBAL_VOLUME_ADJUST",
-                    targetId: targetIdentity,
-                    volume: value
-                });
-                room.localParticipant.publishData(new TextEncoder().encode(payload), { reliable: true });
-            }
-        }
-
-        // STEP 2: SAFE REAL-TIME MODERATION HANDLER (Fixes Network Error)
-        async function moderateUserAction(targetId, action) {
+        async function initMicrophoneOnce() {
+            if (micInitialized) return;
+            const LK = getLiveKit();
             try {
-                const res = await fetch('/api/moderate-user', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        chat_id: currentChatId,
-                        init_data: tg?.initData || "",
-                        target_user_id: parseInt(targetId),
-                        action: action
-                    })
+                localAudioTrack = await LK.createLocalAudioTrack({
+                    echoCancellation: true, noiseSuppression: true, autoGainControl: true
                 });
-
-                const resText = await res.text();
-                let data = {};
-                try { data = JSON.parse(resText); } catch(_) { data = { detail: resText }; }
-
-                if (!res.ok) {
-                    return alert(data.detail || "Action failed");
-                }
-
-                if (room) {
-                    const signal = JSON.stringify({
-                        type: action === "mute" ? "ADMIN_LOCK_MIC" : (action === "kick" ? "ADMIN_KICK" : "ADMIN_UNLOCK_MIC"),
-                        targetId: String(targetId)
-                    });
-                    room.localParticipant.publishData(new TextEncoder().encode(signal), { reliable: true });
-                }
-
-                closeProfileModal();
+                await localAudioTrack.mute();
+                await room.localParticipant.publishTrack(localAudioTrack);
+                micInitialized = true;
+                isMuted = true;
             } catch(e) {
-                console.error("Moderation error:", e);
-                alert("Action error: " + (e.message || "Request failed"));
+                console.warn("Mic initialization error:", e);
             }
-        }
-
-        function handleSpeakers(speakers) {
-            document.querySelectorAll('[id^="user-"]').forEach(el => el.classList.remove('speaking'));
-            speakers.forEach(s => {
-                const target = document.getElementById(`user-${s.identity}`);
-                if (target) target.classList.add('speaking');
-            });
         }
 
         async function toggleMic() {
             if (!room) return;
-            const LK = getLiveKit();
-
-            if (room.localParticipant.permissions && !room.localParticipant.permissions.canPublish) {
-                return alert("You have been muted by an Administrator and cannot speak.");
+            if (amIHardLocked) {
+                return alert("You are locked by Admin/Owner and cannot unmute yourself.");
             }
 
-            try {
-                if (!localAudioTrack) {
-                    localAudioTrack = await LK.createLocalAudioTrack({
-                        echoCancellation: true,
-                        noiseSuppression: true,
-                        autoGainControl: true,
-                        highpassFilter: true
-                    });
-                    await room.localParticipant.publishTrack(localAudioTrack, { dtx: false, red: true });
-                    isMuted = false;
-                } else {
-                    if (isMuted) {
-                        await localAudioTrack.unmute();
-                        isMuted = false;
-                    } else {
-                        await localAudioTrack.mute();
-                        isMuted = true;
-                    }
-                }
-            } catch(e) {
-                console.warn("Mic toggle error:", e);
+            if (!localAudioTrack) {
+                await initMicrophoneOnce();
+            }
+
+            if (isMuted) {
+                await localAudioTrack.unmute();
+                isMuted = false;
+            } else {
+                await localAudioTrack.mute();
                 isMuted = true;
+                isSpeakingNow = false;
             }
-
             updateMicUI();
         }
 
+        // TELEGRAM NATIVE DYNAMIC MIC GLOW & STATE UPDATE
         function updateMicUI() {
             const btn = document.getElementById('mic-btn');
             const icon = document.getElementById('mic-icon');
-            if (isMuted) {
-                btn.className = "w-14 h-14 rounded-full bg-rose-600 text-white flex items-center justify-center shadow-lg active:scale-95 transition border-2 border-white/20";
-                icon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 02-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/><line x1="2" y1="2" x2="22" y2="22" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>`;
+            const label = document.getElementById('mic-status-label');
+
+            if (amIHardLocked) {
+                btn.className = "w-18 h-18 rounded-full bg-slate-700 text-slate-400 flex items-center justify-center shadow-xl active:scale-95 transition relative";
+                icon.innerHTML = `<path d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 02-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/><line x1="2" y1="2" x2="22" y2="22" stroke="currentColor" stroke-width="2"/>`;
+                label.innerText = "Locked";
+                btn.classList.remove('mic-halo-glow');
+            } else if (isMuted) {
+                btn.className = "w-18 h-18 rounded-full bg-[#38bdf8] text-white flex items-center justify-center shadow-xl active:scale-95 transition relative";
+                icon.innerHTML = `<path d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.12c0-.04.02-.08.02-.12V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.94zM4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.33 3 2.99 3 .22 0 .44-.03.65-.08l1.66 1.66c-.71.33-1.5.52-2.31.52-2.76 0-5.3-2.1-5.3-5.1H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c.91-.13 1.77-.45 2.54-.9L19.73 21 21 19.73 4.27 3z"/>`;
+                label.innerText = "Unmute";
+                btn.classList.remove('mic-halo-glow');
             } else {
-                btn.className = "w-14 h-14 rounded-full bg-gradient-to-tr from-pink-500 via-purple-500 to-indigo-500 text-white flex items-center justify-center shadow-lg shadow-purple-500/40 active:scale-95 transition border-2 border-white/20";
-                icon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 02-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/>`;
+                btn.className = "w-18 h-18 rounded-full bg-[#22c55e] text-white flex items-center justify-center shadow-xl active:scale-95 transition relative";
+                icon.innerHTML = `<path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>`;
+                label.innerText = "You're Live";
+
+                // Glows dynamically when speaking
+                if (isSpeakingNow) {
+                    btn.classList.add('mic-halo-glow');
+                } else {
+                    btn.classList.remove('mic-halo-glow');
+                }
             }
         }
 
@@ -665,26 +399,192 @@
 
             if (bluetoothDeviceId) {
                 currentSinkId = (currentSinkId === bluetoothDeviceId) ? "default" : bluetoothDeviceId;
-                audios.forEach(a => {
-                    if (a.setSinkId) a.setSinkId(currentSinkId).catch(() => {});
-                });
+                audios.forEach(a => { if (a.setSinkId) a.setSinkId(currentSinkId).catch(() => {}); });
                 const btIcon = document.getElementById('icon-bluetooth');
-                if (currentSinkId === bluetoothDeviceId) btIcon.classList.add('text-sky-400');
-                else btIcon.classList.remove('text-sky-400');
+                const outLabel = document.getElementById('output-label');
+                if (currentSinkId === bluetoothDeviceId) {
+                    btIcon.classList.add('text-emerald-300');
+                    outLabel.innerText = "Bluetooth";
+                } else {
+                    btIcon.classList.remove('text-emerald-300');
+                    outLabel.innerText = "Speaker";
+                }
             } else {
                 isSpeakerOn = !isSpeakerOn;
                 audios.forEach(a => a.muted = !isSpeakerOn);
                 const btn = document.getElementById('spk-btn');
-                btn.className = isSpeakerOn 
-                    ? "w-11 h-11 rounded-full dark:bg-slate-700/40 bg-slate-200 border dark:border-white/10 border-slate-300 dark:text-slate-200 text-slate-700 flex items-center justify-center active:scale-90 transition" 
-                    : "w-11 h-11 rounded-full dark:bg-slate-800 bg-slate-300 text-slate-400 flex items-center justify-center active:scale-90 transition";
+                const outLabel = document.getElementById('output-label');
+                if (isSpeakerOn) {
+                    btn.className = "w-13 h-13 p-3 rounded-full bg-[#38bdf8] text-white flex items-center justify-center shadow-lg active:scale-90 transition";
+                    outLabel.innerText = "Speaker";
+                } else {
+                    btn.className = "w-13 h-13 p-3 rounded-full bg-slate-700 text-slate-400 flex items-center justify-center shadow-lg active:scale-90 transition";
+                    outLabel.innerText = "Muted";
+                }
             }
         }
 
+        function renderUsers() {
+            if (!room) return;
+            const grid = document.getElementById('grid');
+            grid.innerHTML = "";
+            const participants = [room.localParticipant, ...Array.from(room.remoteParticipants.values())];
+            document.getElementById('participant-count').innerText = participants.length;
+
+            participants.forEach(p => {
+                let meta = {};
+                try { meta = JSON.parse(p.metadata || "{}"); } catch(e) {}
+                const state = participantStates[p.identity] || { is_muted: meta.is_muted };
+
+                const card = document.createElement('div');
+                card.className = "flex flex-col items-center gap-1.5 cursor-pointer";
+                card.onclick = () => openProfileModal(p, meta, state);
+
+                const bubble = document.createElement('div');
+                bubble.id = `user-${p.identity}`;
+                bubble.className = `relative w-16 h-16 rounded-full border-2 ${meta.is_owner ? 'border-amber-400' : (meta.is_admin ? 'border-sky-400' : 'border-white/10')} flex items-center justify-center bg-slate-800 overflow-hidden`;
+
+                if (meta.photo_url) {
+                    bubble.innerHTML = `<img src="${meta.photo_url}" class="w-full h-full object-cover">`;
+                } else {
+                    bubble.innerHTML = `<span class="font-bold text-base text-white">${(p.name || "U")[0]}</span>`;
+                }
+
+                if (state.is_muted) {
+                    const muteBadge = document.createElement('div');
+                    muteBadge.className = "absolute bottom-0 right-0 bg-rose-600 rounded-full p-1 border border-black";
+                    muteBadge.innerHTML = `<svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 02-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/><line x1="2" y1="2" x2="22" y2="22" stroke="currentColor" stroke-width="2"/></svg>`;
+                    bubble.appendChild(muteBadge);
+                }
+
+                const label = document.createElement('span');
+                label.className = "text-[11px] font-semibold truncate max-w-[75px]";
+                label.innerText = p.name || `User ${p.identity}`;
+
+                card.appendChild(bubble);
+                card.appendChild(label);
+                grid.appendChild(card);
+            });
+        }
+
+        function openProfileModal(p, meta, state) {
+            const isSelf = p.identity === room?.localParticipant?.identity;
+            document.getElementById('modal-name').innerText = p.name || "User";
+            document.getElementById('modal-avatar').innerHTML = meta.photo_url ? `<img src="${meta.photo_url}" class="w-full h-full object-cover">` : `<div class="w-full h-full bg-slate-700 text-white flex items-center justify-center font-bold text-lg">${(p.name || "U")[0]}</div>`;
+
+            const roleEl = document.getElementById('modal-role');
+            roleEl.innerText = meta.is_owner ? "Bot Owner" : (meta.is_admin ? "Group Admin" : "Member");
+            roleEl.className = `text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full inline-block mt-1 ${meta.is_owner ? 'bg-amber-400/20 text-amber-400' : (meta.is_admin ? 'bg-sky-400/20 text-sky-400' : 'bg-slate-500/20 text-slate-400')}`;
+
+            const actionsBox = document.getElementById('modal-actions');
+            const ownerOpt = document.getElementById('owner-opt-allow-admin');
+            const muteBtn = document.getElementById('btn-mod-mute');
+
+            let canModerate = false;
+            let canUnmute = false;
+
+            if (!isSelf && !meta.is_owner) {
+                if (amIBotOwner) {
+                    canModerate = true;
+                    canUnmute = true;
+                } else if (amIGroupAdmin && !meta.is_admin) {
+                    canModerate = true;
+                    if (state.is_muted) {
+                        canUnmute = !state.by_owner || state.allow_admin;
+                    } else {
+                        canUnmute = true;
+                    }
+                }
+            }
+
+            if (canModerate) {
+                actionsBox.classList.remove('hidden');
+                if (amIBotOwner) ownerOpt.classList.remove('hidden'); else ownerOpt.classList.add('hidden');
+
+                if (state.is_muted) {
+                    muteBtn.innerText = "Unlock Mic";
+                    muteBtn.className = "py-2 px-3 bg-emerald-500/20 text-emerald-400 rounded-xl text-xs font-semibold";
+                    muteBtn.disabled = !canUnmute;
+                    muteBtn.onclick = () => executeModAction(p.identity, "unmute");
+                } else {
+                    muteBtn.innerText = "Lock Mic";
+                    muteBtn.className = "py-2 px-3 bg-amber-500/20 text-amber-400 rounded-xl text-xs font-semibold";
+                    muteBtn.disabled = false;
+                    muteBtn.onclick = () => executeModAction(p.identity, "mute");
+                }
+
+                document.getElementById('btn-mod-kick').onclick = () => executeModAction(p.identity, "kick");
+            } else {
+                actionsBox.classList.add('hidden');
+            }
+
+            document.getElementById('profile-modal').classList.remove('hidden');
+        }
+
+        function closeProfileModal() { document.getElementById('profile-modal').classList.add('hidden'); }
+
+        async function executeModAction(targetId, action) {
+            const allowAdmin = document.getElementById('chk-allow-admin').checked;
+            try {
+                const res = await fetch('/api/moderate-user', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        chat_id: currentChatId,
+                        init_data: tg?.initData || "",
+                        target_user_id: parseInt(targetId),
+                        action: action,
+                        allow_admin_unmute: allowAdmin
+                    })
+                });
+
+                const data = await res.json();
+                if (!res.ok) return alert(data.detail || "Action failed");
+
+                const stateObj = {
+                    is_muted: action === "mute",
+                    by_owner: amIBotOwner,
+                    allow_admin: allowAdmin
+                };
+
+                if (action === "kick") {
+                    room.localParticipant.publishData(new TextEncoder().encode(JSON.stringify({ type: "MOD_KICK", targetId })), { reliable: true });
+                } else {
+                    participantStates[targetId] = stateObj;
+                    room.localParticipant.publishData(new TextEncoder().encode(JSON.stringify({
+                        type: "MOD_STATE_CHANGE", targetId, state: stateObj
+                    })), { reliable: true });
+                }
+
+                renderUsers();
+                closeProfileModal();
+            } catch(e) {
+                alert("Network error: " + e.message);
+            }
+        }
+
+        // DYNAMIC AUDIO DETECTION: TURNS ON GLOW WHEN YOU SPEAK
+        function handleSpeakers(speakers) {
+            document.querySelectorAll('[id^="user-"]').forEach(el => el.classList.remove('speaking-border'));
+            let amISpeaking = false;
+
+            speakers.forEach(s => {
+                const t = document.getElementById(`user-${s.identity}`);
+                if (t) t.classList.add('speaking-border');
+
+                if (room && s.identity === room.localParticipant.identity) {
+                    amISpeaking = true;
+                }
+            });
+
+            isSpeakingNow = amISpeaking && !isMuted;
+            updateMicUI();
+        }
+
         function toggleChatInput() {
-            const bar = document.getElementById('chat-input-bar');
-            bar.classList.toggle('hidden');
-            if (!bar.classList.contains('hidden')) document.getElementById('chat-input').focus();
+            const b = document.getElementById('chat-input-bar');
+            b.classList.toggle('hidden');
+            if (!b.classList.contains('hidden')) document.getElementById('chat-input').focus();
         }
 
         function handleSendChat(e) {
@@ -693,75 +593,39 @@
             const msg = input.value.trim();
             if (!msg || !room) return;
 
-            const myName = room.localParticipant.name || "Me";
-            const payload = JSON.stringify({ 
-                name: myName, 
-                photo_url: myPhotoUrl,
-                text: msg 
-            });
+            const payload = JSON.stringify({ type: "CHAT", name: room.localParticipant.name || "Me", photo_url: myPhotoUrl, text: msg });
             room.localParticipant.publishData(new TextEncoder().encode(payload), { reliable: true });
-
-            displayFloatingMessage(myName, myPhotoUrl, msg);
+            displayFloatingMessage(room.localParticipant.name || "Me", myPhotoUrl, msg);
             input.value = "";
             toggleChatInput();
         }
 
         function displayFloatingMessage(name, photoUrl, text) {
             const overlay = document.getElementById('live-chat-overlay');
-            if (overlay.children.length >= MAX_MESSAGES) overlay.removeChild(overlay.firstChild);
-
             const item = document.createElement('div');
-            item.className = "tg-floating-pill px-3 py-1.5 rounded-full text-xs flex items-center gap-2 max-w-[90%] pointer-events-auto transition-all";
-            
-            let avatarHtml = '';
-            if (photoUrl) {
-                avatarHtml = `<img src="${photoUrl}" class="w-5 h-5 rounded-full object-cover shrink-0 border border-white/20">`;
-            } else {
-                const initial = (name || "U")[0].toUpperCase();
-                avatarHtml = `<div class="w-5 h-5 rounded-full bg-slate-700 text-white flex items-center justify-center text-[10px] font-bold shrink-0 border border-white/20">${initial}</div>`;
-            }
-
-            item.innerHTML = `
-                ${avatarHtml}
-                <div class="flex items-center gap-1.5 overflow-hidden">
-                    <span class="font-bold text-[11px] dark:text-slate-100 text-slate-900 shrink-0 truncate max-w-[110px]">${name}</span>
-                    <span class="dark:text-slate-300 text-slate-700 text-[11px] truncate">${text}</span>
-                </div>
-            `;
-
+            item.className = "tg-floating-pill px-3 py-1.5 rounded-full text-xs flex items-center gap-2 max-w-[90%] text-white";
+            item.innerHTML = `<span class="font-bold text-indigo-400">${name}:</span> <span class="truncate">${text}</span>`;
             overlay.appendChild(item);
-
-            setTimeout(() => {
-                item.classList.add('tg-pill-exit');
-                setTimeout(() => {
-                    if (item.parentNode === overlay) overlay.removeChild(item);
-                }, 350);
-            }, MESSAGE_LIFETIME);
+            setTimeout(() => { if (item.parentNode === overlay) overlay.removeChild(item); }, 20000);
         }
 
         async function leaveSpace() {
-            if (localAudioTrack) {
-                localAudioTrack.stop();
-                localAudioTrack = null;
-            }
+            if (localAudioTrack) { localAudioTrack.stop(); }
             if (room) await room.disconnect();
-            if (tg && tg.close) tg.close();
-            else window.close();
+            if (tg && tg.close) tg.close(); else window.close();
+        }
+
+        function toggleTheme() {
+            const root = document.getElementById('html-root');
+            root.classList.toggle('dark');
+            root.classList.toggle('light');
         }
 
         window.addEventListener('DOMContentLoaded', () => {
-            try {
-                const saved = localStorage.getItem('theme_pref') || 'dark';
-                setTheme(saved);
-            } catch(e) {}
-
             let attempts = 0;
-            const timer = setInterval(() => {
+            const t = setInterval(() => {
                 attempts++;
-                if (getLiveKit() || attempts > 25) {
-                    clearInterval(timer);
-                    startVoiceSession();
-                }
+                if (getLiveKit() || attempts > 25) { clearInterval(t); startVoiceSession(); }
             }, 100);
         });
     </script>
