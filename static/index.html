@@ -24,29 +24,47 @@
 
         /* Telegram Native Floating Chat Pill */
         .tg-chat-bubble {
-            animation: slideUpPill 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            animation: slideUpPill 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
             background: rgba(23, 30, 42, 0.92);
             backdrop-filter: blur(14px);
             border: 1px solid rgba(255, 255, 255, 0.09);
             box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
         }
         @keyframes slideUpPill { 
-            from { opacity: 0; transform: translateY(12px) scale(0.92); } 
+            from { opacity: 0; transform: translateY(14px) scale(0.92); } 
             to { opacity: 1; transform: translateY(0) scale(1); } 
         }
 
-        /* Animated Emoji inside Chat Message */
-        .animated-chat-emoji {
+        /* 3D Realistic Animated Emoji Physics */
+        .realistic-emoji-img {
+            width: 28px;
+            height: 28px;
+            object-fit: contain;
             display: inline-block;
-            font-size: 20px;
-            line-height: 1;
-            transform-origin: center bottom;
-            animation: emojiBounce 1.2s cubic-bezier(0.28, 0.84, 0.42, 1) infinite alternate;
+            filter: drop-shadow(0 4px 8px rgba(0,0,0,0.35));
+            animation: realisticSpring 1.4s cubic-bezier(0.34, 1.56, 0.64, 1) infinite alternate;
         }
-        @keyframes emojiBounce {
-            0% { transform: scale(0.9) translateY(0); }
-            50% { transform: scale(1.35) translateY(-4px) rotate(-6deg); }
-            100% { transform: scale(1.15) translateY(-1px) rotate(6deg); }
+
+        @keyframes realisticSpring {
+            0% {
+                transform: scale(0.88) translateY(2px) rotate(-3deg);
+            }
+            50% {
+                transform: scale(1.22) translateY(-4px) rotate(4deg);
+            }
+            100% {
+                transform: scale(1.05) translateY(-1px) rotate(-2deg);
+            }
+        }
+
+        .dock-emoji-btn {
+            transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .dock-emoji-btn:active {
+            transform: scale(0.75);
+        }
+        .dock-emoji-btn:hover {
+            transform: scale(1.25);
         }
 
         .aesthetic-dock {
@@ -117,33 +135,19 @@
     <!-- Floating Live Chat Messages -->
     <div id="live-chat-overlay" class="absolute bottom-28 left-4 right-4 z-20 flex flex-col items-center justify-end space-y-2 pointer-events-none max-h-44 overflow-hidden"></div>
 
-    <!-- COMBINED MESSAGE & EMOJI DRAWER (Hidden by default, auto-hides on keyboard close/blur) -->
+    <!-- COMBINED MESSAGE & 3D REALISTIC EMOJI DRAWER -->
     <div id="message-drawer" class="hidden absolute bottom-24 left-4 right-4 z-30 flex flex-col gap-2 pointer-events-auto">
         
-        <!-- Emoji Selection Bar (Only shows when Message is open) -->
+        <!-- 3D Realistic Emoji Bar -->
         <div class="w-full max-w-sm mx-auto px-1">
-            <div class="reaction-bar-scroll flex items-center gap-2 overflow-x-auto py-1.5 px-3 glass-panel rounded-full shadow-lg border border-white/10">
-                <button type="button" onmousedown="preventInputBlur(event)" onclick="sendEmojiReaction('❤️')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">❤️</button>
-                <button type="button" onmousedown="preventInputBlur(event)" onclick="sendEmojiReaction('🔥')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">🔥</button>
-                <button type="button" onmousedown="preventInputBlur(event)" onclick="sendEmojiReaction('👏')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">👏</button>
-                <button type="button" onmousedown="preventInputBlur(event)" onclick="sendEmojiReaction('😂')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">😂</button>
-                <button type="button" onmousedown="preventInputBlur(event)" onclick="sendEmojiReaction('🚀')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">🚀</button>
-                <button type="button" onmousedown="preventInputBlur(event)" onclick="sendEmojiReaction('🎉')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">🎉</button>
-                <button type="button" onmousedown="preventInputBlur(event)" onclick="sendEmojiReaction('😍')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">😍</button>
-                <button type="button" onmousedown="preventInputBlur(event)" onclick="sendEmojiReaction('💯')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">💯</button>
-                <button type="button" onmousedown="preventInputBlur(event)" onclick="sendEmojiReaction('⚡')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">⚡</button>
-                <button type="button" onmousedown="preventInputBlur(event)" onclick="sendEmojiReaction('😎')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">😎</button>
-                <button type="button" onmousedown="preventInputBlur(event)" onclick="sendEmojiReaction('🥳')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">🥳</button>
-                <button type="button" onmousedown="preventInputBlur(event)" onclick="sendEmojiReaction('🤯')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">🤯</button>
-                <button type="button" onmousedown="preventInputBlur(event)" onclick="sendEmojiReaction('✨')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">✨</button>
-                <button type="button" onmousedown="preventInputBlur(event)" onclick="sendEmojiReaction('👍')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">👍</button>
-                <button type="button" onmousedown="preventInputBlur(event)" onclick="sendEmojiReaction('🫡')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">🫡</button>
+            <div id="emoji-picker-container" class="reaction-bar-scroll flex items-center gap-2 overflow-x-auto py-2 px-3 glass-panel rounded-full shadow-lg border border-white/10">
+                <!-- Injected via JavaScript for 3D Assets -->
             </div>
         </div>
 
         <!-- Text Chat Input Form -->
         <form id="chat-form" onsubmit="handleSendChat(event)" class="glass-panel p-2 rounded-2xl flex gap-2 shadow-2xl max-w-sm mx-auto w-full">
-            <input id="chat-input" type="text" placeholder="Type message or tap emoji..." autocomplete="off" class="flex-1 px-4 py-2.5 rounded-xl dark:bg-slate-900 bg-white border border-white/10 dark:text-white text-slate-900 text-xs outline-none focus:border-sky-500">
+            <input id="chat-input" type="text" placeholder="Type message or tap 3D emoji..." autocomplete="off" class="flex-1 px-4 py-2.5 rounded-xl dark:bg-slate-900 bg-white border border-white/10 dark:text-white text-slate-900 text-xs outline-none focus:border-sky-500">
             <button type="submit" onmousedown="preventInputBlur(event)" class="px-4 py-2.5 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-semibold active:scale-95 transition">Send</button>
         </form>
     </div>
@@ -179,7 +183,7 @@
             <span id="mic-status-label" class="text-[11px] font-bold text-slate-800 dark:text-slate-200">Unmute</span>
         </div>
 
-        <!-- 3. Message Button (Toggles both Chat and Emojis) -->
+        <!-- 3. Message Button -->
         <div class="flex flex-col items-center gap-1.5 flex-1">
             <button id="msg-btn" onclick="toggleMessageDrawer(event)" class="w-12 h-12 rounded-full bg-emerald-500/15 dark:bg-emerald-400/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center justify-center shadow-sm active:scale-90 transition">
                 <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -307,6 +311,43 @@
 
         function getLiveKit() { return window.LivekitClient || window.livekit || window.LiveKit; }
 
+        // ==============================================================
+        // REALISTIC 3D ANIMATED EMOJI DEFINITIONS (High-Res 3D Assets)
+        // ==============================================================
+        const REALISTIC_EMOJIS = [
+            { key: 'heart', url: 'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Smilies/Red%20Heart.png', fallback: '❤️' },
+            { key: 'fire', url: 'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Travel%20and%20places/Fire.png', fallback: '🔥' },
+            { key: 'clap', url: 'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Hand%20gestures/Clapping%20Hands.png', fallback: '👏' },
+            { key: 'joy', url: 'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Smilies/Rolling%20on%20the%20Floor%20Laughing.png', fallback: '😂' },
+            { key: 'rocket', url: 'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Travel%20and%20places/Rocket.png', fallback: '🚀' },
+            { key: 'party', url: 'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Activities/Party%20Popper.png', fallback: '🎉' },
+            { key: 'heart_eyes', url: 'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Smilies/Smiling%20Face%20with%20Heart-Eyes.png', fallback: '😍' },
+            { key: 'hundred', url: 'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Symbols/Hundred%20Points.png', fallback: '💯' },
+            { key: 'zap', url: 'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Travel%20and%20places/High%20Voltage.png', fallback: '⚡' },
+            { key: 'sunglasses', url: 'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Smilies/Smiling%20Face%20with%20Sunglasses.png', fallback: '😎' },
+            { key: 'partying_face', url: 'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Smilies/Partying%20Face.png', fallback: '🥳' },
+            { key: 'mind_blown', url: 'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Smilies/Exploding%20Head.png', fallback: '🤯' },
+            { key: 'sparkles', url: 'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Activities/Sparkles.png', fallback: '✨' },
+            { key: 'thumbs_up', url: 'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Hand%20gestures/Thumbs%20Up.png', fallback: '👍' },
+            { key: 'salute', url: 'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Smilies/Saluting%20Face.png', fallback: '🫡' }
+        ];
+
+        function initEmojiPicker() {
+            const container = document.getElementById('emoji-picker-container');
+            if (!container) return;
+            container.innerHTML = "";
+
+            REALISTIC_EMOJIS.forEach(item => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = "dock-emoji-btn w-8 h-8 flex items-center justify-center shrink-0 p-0.5";
+                btn.onmousedown = preventInputBlur;
+                btn.onclick = () => sendRealisticEmoji(item.key);
+                btn.innerHTML = `<img src="${item.url}" alt="${item.fallback}" class="w-full h-full object-contain pointer-events-none" onerror="this.outerHTML='<span class=\\'text-xl\\'>${item.fallback}</span>'">`;
+                container.appendChild(btn);
+            });
+        }
+
         // ==========================================
         // DRAWER & KEYBOARD AUTO-DISMISS CONTROLS
         // ==========================================
@@ -335,7 +376,7 @@
         }
 
         function preventInputBlur(e) {
-            e.preventDefault(); // Prevents input blur when tapping emoji or send button
+            e.preventDefault();
         }
 
         function handleBodyClick(e) {
@@ -343,17 +384,15 @@
             const drawer = document.getElementById('message-drawer');
             const msgBtn = document.getElementById('msg-btn');
 
-            // Agar click drawer ke bahar hua hai to drawer band kar do
             if (isDrawerOpen && !drawer.contains(e.target) && !msgBtn.contains(e.target)) {
                 hideMessageDrawer();
             }
         }
 
-        // Keyboard band hone par (Android/iOS blur) auto-hide
         document.addEventListener('DOMContentLoaded', () => {
+            initEmojiPicker();
             const input = document.getElementById('chat-input');
             input.addEventListener('blur', () => {
-                // Short timeout to allow button clicks inside drawer
                 setTimeout(() => {
                     if (document.activeElement !== input) {
                         hideMessageDrawer();
@@ -362,16 +401,16 @@
             });
         });
 
-        // EMOJI REACTION SENDER
-        function sendEmojiReaction(emoji) {
+        // REALISTIC 3D EMOJI SENDER
+        function sendRealisticEmoji(emojiKey) {
             if (!room || !room.localParticipant) return;
             const myName = room.localParticipant.name || "Me";
 
             const payload = JSON.stringify({
-                type: "CHAT_REACTION",
+                type: "CHAT_REALISTIC_REACTION",
                 name: myName,
                 photo_url: myPhotoUrl,
-                emoji: emoji
+                emojiKey: emojiKey
             });
 
             try {
@@ -382,8 +421,8 @@
                 console.warn("Reaction error:", e);
             }
 
-            displayFloatingReactionMessage(myName, myPhotoUrl, emoji);
-            hideMessageDrawer(); // Auto close on send
+            displayFloatingRealisticReaction(myName, myPhotoUrl, emojiKey);
+            hideMessageDrawer();
         }
 
         // TEXT CHAT SENDER
@@ -398,11 +437,11 @@
             room.localParticipant.publishData(new TextEncoder().encode(payload), { reliable: true });
             displayFloatingMessage(myName, myPhotoUrl, msg);
             input.value = "";
-            hideMessageDrawer(); // Auto close on send
+            hideMessageDrawer();
         }
 
-        // FLOATING REACTION MESSAGE PILL
-        function displayFloatingReactionMessage(name, photoUrl, emoji) {
+        // REALISTIC 3D REACTION PILL RENDERER
+        function displayFloatingRealisticReaction(name, photoUrl, emojiKey) {
             const overlay = document.getElementById('live-chat-overlay');
             const item = document.createElement('div');
             item.className = "tg-chat-bubble px-3.5 py-1.5 rounded-full text-xs flex items-center gap-2 max-w-[90%] text-white pointer-events-auto border border-white/15 shadow-2xl";
@@ -414,11 +453,13 @@
                 avatarHtml = `<div class="w-5 h-5 rounded-full bg-slate-700 text-white flex items-center justify-center text-[10px] font-bold shrink-0 border border-white/20">${(name || "U")[0].toUpperCase()}</div>`;
             }
 
+            const emojiObj = REALISTIC_EMOJIS.find(e => e.key === emojiKey) || { url: '', fallback: '❤️' };
+
             item.innerHTML = `
                 ${avatarHtml}
                 <div class="flex items-center gap-2 overflow-hidden">
                     <span class="font-bold text-[11px] text-sky-400 shrink-0 truncate max-w-[110px]">${name}:</span>
-                    <span class="animated-chat-emoji">${emoji}</span>
+                    <img src="${emojiObj.url}" alt="${emojiObj.fallback}" class="realistic-emoji-img" onerror="this.outerHTML='<span class=\\'text-lg\\'>${emojiObj.fallback}</span>'">
                 </div>
             `;
 
@@ -644,8 +685,8 @@
                         const msg = JSON.parse(new TextDecoder().decode(payload));
                         const myId = String(room.localParticipant.identity);
 
-                        if (msg.type === "CHAT_REACTION") {
-                            displayFloatingReactionMessage(msg.name, msg.photo_url, msg.emoji);
+                        if (msg.type === "CHAT_REALISTIC_REACTION") {
+                            displayFloatingRealisticReaction(msg.name, msg.photo_url, msg.emojiKey);
                         } else if (msg.type === "MOD_STATE_CHANGE") {
                             participantStates[msg.targetId] = msg.state;
                             renderUsers();
