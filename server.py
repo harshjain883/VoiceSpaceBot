@@ -1,4 +1,4 @@
-                                                    import os
+import os
 import json
 import hmac
 import hashlib
@@ -56,7 +56,7 @@ class ModerateRequest(BaseModel):
     chat_id: str
     init_data: str
     target_user_id: int
-    action: str  # "mute", "unmute", ya "kick"
+    action: str
 
 
 def verify_telegram_init_data(init_data: str, bot_token: str):
@@ -90,7 +90,7 @@ async def get_token(req: TokenRequest):
     photo_url = user_data.get("photo_url", "")
 
     incoming_param = req.chat_id.replace("vc_", "").replace("room_", "")
-    
+
     if "x" in incoming_param:
         raw_chat_part, _ = incoming_param.split("x", 1)
     else:
@@ -212,7 +212,6 @@ async def end_room(req: EndRoomRequest):
     return {"status": "ok"}
 
 
-# SAFE NON-CRASHING MODERATION ENDPOINT
 @app.post("/api/moderate-user")
 async def moderate_user(req: ModerateRequest):
     is_valid, user_data = verify_telegram_init_data(req.init_data, BOT_TOKEN)
@@ -240,15 +239,12 @@ async def moderate_user(req: ModerateRequest):
     caller_is_owner = caller_id in OWNER_IDS
     caller_is_admin = caller_id in admins
 
-    # 1. Action lene wala Bot Owner ya Group Admin hona chahiye
     if not caller_is_owner and not caller_is_admin:
         raise HTTPException(status_code=403, detail="Permission Denied")
 
-    # 2. Bot Owner par koi action nahi le sakta
     if req.target_user_id in OWNER_IDS:
         raise HTTPException(status_code=403, detail="Cannot moderate Bot Owner")
 
-    # 3. Group Admin kisi dusre Group Admin ko moderate nahi kar sakta
     target_is_admin = req.target_user_id in admins
     if not caller_is_owner and target_is_admin:
         raise HTTPException(status_code=403, detail="Group Admins can only moderate regular members")
@@ -263,7 +259,6 @@ async def moderate_user(req: ModerateRequest):
                 api.RoomParticipantIdentity(room=room_name, identity=str(req.target_user_id))
             )
         elif req.action == "mute":
-            # Direct Track Mute jo LiveKit ke har Python SDK version par 100% kaam karta hai
             try:
                 await lk_api.room.mute_published_track(
                     api.MuteRoomTrackRequest(
@@ -274,9 +269,9 @@ async def moderate_user(req: ModerateRequest):
                     )
                 )
             except Exception as mute_err:
-                print(f"[Warning] Track mute fallback executed: {mute_err}")
+                print(f"[Warning] Mute execution: {mute_err}")
     finally:
         await lk_api.aclose()
 
     return {"status": "ok"}
-    
+  
