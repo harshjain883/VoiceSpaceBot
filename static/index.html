@@ -35,7 +35,7 @@
             to { opacity: 1; transform: translateY(0); } 
         }
 
-        /* NATIVE 1:1 WEBP EMOJI (No Zoom-Out/In, Crisp Original Aspect) */
+        /* NATIVE 1:1 WEBP EMOJI */
         .realistic-emoji-img {
             width: 32px;
             height: 32px;
@@ -57,7 +57,6 @@
             display: none;
         }
 
-        /* Horizontal flex row inside vertical reel */
         .carousel-row {
             height: 48px;
             scroll-snap-align: center;
@@ -112,20 +111,38 @@
             border-color: #22c55e !important;
             box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.4), 0 0 20px rgba(34, 197, 94, 0.6) !important;
         }
+
+        .reaction-bar-scroll {
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+        .reaction-bar-scroll::-webkit-scrollbar {
+            display: none;
+        }
     </style>
 </head>
 <body class="h-screen flex flex-col justify-between p-4 select-none relative overflow-hidden" onclick="handleBodyClick(event)">
 
     <div id="remote-audio-container" class="hidden"></div>
 
-    <header class="glass-panel p-3.5 rounded-2xl flex items-center justify-between shadow-xl relative z-10">
+    <!-- Header Bar With Group Picture & Title -->
+    <header class="glass-panel p-2.5 px-3.5 rounded-2xl flex items-center justify-between shadow-xl relative z-10">
         <div class="flex items-center gap-3 overflow-hidden">
-            <span id="status-dot" class="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0 animate-pulse"></span>
+            
+            <!-- Group Picture / Fallback Initial -->
+            <div id="group-avatar-container" class="relative w-9 h-9 rounded-full overflow-hidden shrink-0 border border-white/15 shadow-sm bg-slate-800 flex items-center justify-center">
+                <span id="group-fallback-initial" class="font-bold text-sm bg-gradient-to-tr from-sky-400 to-indigo-400 bg-clip-text text-transparent">G</span>
+                <img id="group-avatar-img" class="w-full h-full object-cover hidden" alt="Group DP">
+                <!-- Status Dot Pin to Group DP -->
+                <span id="status-dot" class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-amber-400 border-2 border-[#141a26] shrink-0 animate-pulse"></span>
+            </div>
+
             <div class="flex flex-col truncate">
-                <span class="text-sm font-bold truncate dark:text-white text-slate-900" id="group-title">Voice Space</span>
-                <span class="text-[10px] dark:text-slate-400 text-slate-500" id="connection-state">Connecting...</span>
+                <span class="text-sm font-bold truncate dark:text-white text-slate-900 leading-tight" id="group-title">Voice Space</span>
+                <span class="text-[10px] dark:text-slate-400 text-slate-500 leading-tight" id="connection-state">Connecting...</span>
             </div>
         </div>
+
         <div class="flex items-center gap-2">
             <div class="glass-pill px-3 py-1.5 rounded-xl text-xs font-semibold dark:text-slate-300 text-slate-700 flex items-center gap-1.5">
                 <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
@@ -145,12 +162,10 @@
     <!-- COMBINED MESSAGE & 3D SINGLE-LINE VERTICAL REEL DRAWER -->
     <div id="message-drawer" class="hidden absolute bottom-24 left-4 right-4 z-30 flex flex-col gap-2 pointer-events-auto">
         
-        <!-- Single-Line Vertical Reel (Slide Down/Up to change emoji row) -->
+        <!-- Single-Line Vertical Reel -->
         <div class="w-full max-w-sm mx-auto px-1">
             <div class="glass-panel rounded-full shadow-lg border border-white/10 px-3 py-1">
-                <div id="emoji-picker-container" class="single-line-carousel">
-                    <!-- Populated in rows of 7 by JavaScript -->
-                </div>
+                <div id="emoji-picker-container" class="single-line-carousel"></div>
             </div>
         </div>
 
@@ -208,6 +223,7 @@
         </div>
     </footer>
 
+    <!-- Custom Modal -->
     <div id="custom-app-dialog" class="hidden fixed inset-0 z-50 bg-black/65 backdrop-blur-sm flex items-center justify-center p-5">
         <div class="glass-panel p-5 rounded-3xl max-w-xs w-full text-left space-y-3 shadow-2xl border border-white/10">
             <div class="flex items-center justify-between">
@@ -222,6 +238,7 @@
         </div>
     </div>
 
+    <!-- Profile Modal -->
     <div id="profile-modal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
         <div class="glass-panel p-5 rounded-3xl max-w-xs w-full text-center space-y-4 shadow-2xl">
             <div id="modal-avatar" class="w-16 h-16 rounded-full mx-auto overflow-hidden border-2 border-indigo-500"></div>
@@ -313,7 +330,7 @@
         function getLiveKit() { return window.LivekitClient || window.livekit || window.LiveKit; }
 
         // ==============================================================
-        // SINGLE-LINE 3D VERTICAL REEL SETUP (37 Emojis in rows of 7)
+        // SINGLE-LINE 3D VERTICAL REEL SETUP
         // ==============================================================
         const TOTAL_EMOJIS = 37;
         const PER_ROW = 7;
@@ -429,7 +446,6 @@
             hideMessageDrawer();
         }
 
-        // ORIGINAL WEBP DISPLAY (Exact aspect ratio, no zoom artifacts)
         function displayFloatingRealisticReaction(name, photoUrl, emojiId) {
             const overlay = document.getElementById('live-chat-overlay');
             const item = document.createElement('div');
@@ -478,6 +494,9 @@
             setTimeout(() => { if (item.parentNode === overlay) overlay.removeChild(item); }, 15000);
         }
 
+        // ==========================================
+        // HARDWARE AUDIO ROUTING
+        // ==========================================
         async function refreshAudioDevices() {
             if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
             try {
@@ -603,6 +622,9 @@
             });
         }
 
+        // ==========================================
+        // VOICE ROOM & LIVEKIT
+        // ==========================================
         async function startVoiceSession() {
             const urlParams = new URLSearchParams(window.location.search);
             currentChatId = tg?.initDataUnsafe?.start_param || urlParams.get('tgWebAppStartParam') || urlParams.get('chat_id') || "";
@@ -621,7 +643,24 @@
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.detail || "Authentication Failed");
 
-                document.getElementById('group-title').innerText = data.group_title || "Voice Space";
+                // 1. Group Title Update
+                const groupTitle = data.group_title || "Voice Space";
+                document.getElementById('group-title').innerText = groupTitle;
+
+                // 2. Group Profile Photo Update
+                const avatarImg = document.getElementById('group-avatar-img');
+                const fallbackInitial = document.getElementById('group-fallback-initial');
+
+                if (data.group_photo_url) {
+                    avatarImg.src = data.group_photo_url;
+                    avatarImg.classList.remove('hidden');
+                    fallbackInitial.classList.add('hidden');
+                } else {
+                    fallbackInitial.innerText = (groupTitle.trim()[0] || "G").toUpperCase();
+                    fallbackInitial.classList.remove('hidden');
+                    avatarImg.classList.add('hidden');
+                }
+
                 amIBotOwner = data.is_owner || false;
                 amIGroupAdmin = data.is_admin || false;
                 amIHardLocked = data.is_muted || false;
@@ -704,7 +743,7 @@
                 await refreshAudioDevices();
 
                 document.getElementById('connection-state').innerText = "Connected";
-                document.getElementById('status-dot').className = "w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0";
+                document.getElementById('status-dot').className = "absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-[#141a26] shrink-0";
                 updateMicUI();
                 renderUsers();
 
@@ -777,7 +816,7 @@
                 icon.innerHTML = `<path d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.12c0-.04.02-.08.02-.12V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.94zM4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.33 3 2.99 3 .22 0 .44-.03.65-.08l1.66 1.66c-.71.33-1.5.52-2.31.52-2.76 0-5.3-2.1-5.3-5.1H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c.91-.13 1.77-.45 2.54-.9L19.73 21 21 19.73 4.27 3z"/>`;
                 label.innerText = "Unmute";
                 btn.classList.remove('mic-speaking-glow');
-             } else {
+            } else {
                 btn.className = "w-16 h-16 rounded-full bg-gradient-to-tr from-emerald-500 to-emerald-400 text-white flex items-center justify-center shadow-lg shadow-emerald-500/35 active:scale-95 transition relative border-2 border-white/40 dark:border-white/20";
                 icon.innerHTML = `<path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>`;
                 label.innerText = "You're Live";
