@@ -122,7 +122,7 @@
     <!-- Error Banner -->
     <div id="error-banner" class="hidden glass-pill bg-rose-500/20 border-rose-500/40 text-rose-500 dark:text-rose-300 text-xs px-4 py-2 rounded-xl text-center mb-2 relative z-10 mx-auto max-w-xs shadow-lg"></div>
 
-    <!-- Bottom Dock Controls (Leave | Mic | Chat | Output Switcher) -->
+    <!-- Bottom Dock Controls -->
     <footer class="glass-panel px-5 py-3 rounded-full max-w-sm mx-auto w-full flex items-center justify-between shadow-2xl relative z-10 mb-2 border border-white/10">
         <button onclick="leaveSpace()" class="w-11 h-11 rounded-full bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/25 text-rose-500 flex items-center justify-center active:scale-90 transition">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 8l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M5 3a2 2 0 00-2 2v1c0 8.284 6.716 15 15 15h1a2 2 0 002-2v-3.28a1 1 0 00-.684-.948l-4.493-1.498a1 1 0 00-1.21.502l-1.13 2.257a11.042 11.042 0 01-5.516-5.517l2.257-1.128a1 1 0 00.502-1.21L9.228 3.683A1 1 0 008.279 3H5z"/></svg>
@@ -333,7 +333,6 @@
                     publishDefaults: { dtx: false, red: true }
                 });
 
-                // ADMIN /STOPVC & INSTANT EXPULSION HANDLER
                 room.on(LK.RoomEvent.Disconnected, (reason) => {
                     const isRoomEnded = (reason === LK.DisconnectReason?.ROOM_DELETED || reason === 2);
                     
@@ -373,12 +372,11 @@
                 room.on(LK.RoomEvent.ParticipantDisconnected, renderUsers);
                 room.on(LK.RoomEvent.ActiveSpeakersChanged, handleSpeakers);
 
-                // REAL-TIME SIGNAL DISPATCHER (Lock Mic, Kick, Volume, Chat)
+                // REAL-TIME SIGNAL DISPATCHER (Step 2 Integration)
                 room.on(LK.RoomEvent.DataReceived, async (payload) => {
                     try {
                         const msgObj = JSON.parse(new TextDecoder().decode(payload));
                         
-                        // 1. Admin Mic Lock
                         if (msgObj.type === "ADMIN_LOCK_MIC") {
                             if (msgObj.targetId === String(room.localParticipant.identity)) {
                                 if (localAudioTrack) {
@@ -389,18 +387,15 @@
                                 alert("An Administrator has locked your microphone.");
                             }
                         }
-                        // 2. Admin Kick
                         else if (msgObj.type === "ADMIN_KICK") {
                             if (msgObj.targetId === String(room.localParticipant.identity)) {
                                 alert("You have been removed from the Voice Space by Admin.");
                                 leaveSpace();
                             }
                         }
-                        // 3. Global Volume Adjust
                         else if (msgObj.type === "GLOBAL_VOLUME_ADJUST") {
                             applyAudioVolumeLocally(msgObj.targetId, msgObj.volume);
                         } 
-                        // 4. In-room Chat
                         else {
                             displayFloatingMessage(msgObj.name, msgObj.photo_url, msgObj.text);
                         }
@@ -572,7 +567,7 @@
             }
         }
 
-        // STEP 2: SAFE REAL-TIME MODERATION ACTION HANDLER
+        // STEP 2: SAFE REAL-TIME MODERATION HANDLER (Fixes Network Error)
         async function moderateUserAction(targetId, action) {
             try {
                 const res = await fetch('/api/moderate-user', {
@@ -594,7 +589,6 @@
                     return alert(data.detail || "Action failed");
                 }
 
-                // Instant DataChannel Broadcast to Target User
                 if (room) {
                     const signal = JSON.stringify({
                         type: action === "mute" ? "ADMIN_LOCK_MIC" : (action === "kick" ? "ADMIN_KICK" : "ADMIN_UNLOCK_MIC"),
