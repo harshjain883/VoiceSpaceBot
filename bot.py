@@ -36,9 +36,13 @@ bot = Client(
 BOT_START_TIME = time.time()
 
 
+# --- 1. PRIVATE /start COMMAND ---
 @bot.on_message(filters.command("start") & filters.private)
 async def start_private_handler(client: Client, message: types.Message):
     args = message.command
+    user_id = message.from_user.id
+    user_mention = message.from_user.mention
+
     if len(args) > 1:
         param = args[1]
         direct_url = f"https://t.me/{BOT_USERNAME}/{APP_SHORT_NAME}?startapp={param}"
@@ -51,7 +55,6 @@ async def start_private_handler(client: Client, message: types.Message):
             reply_markup=markup
         )
 
-    user_mention = message.from_user.mention
     text = (
         "┌─ ᴠᴏɪᴄᴇ sᴘᴀᴄᴇ ᴍᴀɴᴀɢᴇʀ ─┐\n\n"
         f"ɢʀᴇᴇᴛɪɴɢs {user_mention},\n\n"
@@ -65,16 +68,25 @@ async def start_private_handler(client: Client, message: types.Message):
         "ᴀᴅᴅ ᴛʜɪs ʙᴏᴛ ᴛᴏ ʏᴏᴜʀ ɢʀᴏᴜᴘ ᴛᴏ ʙᴇɢɪɴ."
     )
 
-    markup = InlineKeyboardMarkup([
+    buttons = [
         [InlineKeyboardButton("ᴀᴅᴅ ᴛᴏ ɢʀᴏᴜᴘ", url=f"https://t.me/{BOT_USERNAME}?startgroup=true")],
         [
             InlineKeyboardButton("ɢᴜɪᴅᴇ", callback_data="cb_help"),
             InlineKeyboardButton("ᴘɪɴɢ", callback_data="cb_ping")
         ]
-    ])
+    ]
+
+    # Owner-only panel button is visible; tap verification enforces access control
+    if user_id in OWNER_IDS:
+        buttons.append([InlineKeyboardButton("★ ᴏᴡɴᴇʀ ᴘᴀɴᴇʟ ★", callback_data="cb_owner_panel")])
+    else:
+        buttons.append([InlineKeyboardButton("ᴏᴡɴᴇʀ ᴘᴀɴᴇʟ", callback_data="cb_owner_panel")])
+
+    markup = InlineKeyboardMarkup(buttons)
     await message.reply_text(text, reply_markup=markup, disable_web_page_preview=True)
 
 
+# --- 2. GROUP /vc LAUNCHER ---
 @bot.on_message(filters.command(["vc", "startvc"]) & filters.group)
 async def start_vc_command(client: Client, message: types.Message):
     chat = message.chat
@@ -121,7 +133,6 @@ async def start_vc_command(client: Client, message: types.Message):
 
     unique_app_link = f"https://t.me/{BOT_USERNAME}/{APP_SHORT_NAME}?startapp={dynamic_session_param}"
 
-    # Clean Card without session ID string
     card_text = (
         "┌─ ᴠᴏɪᴄᴇ sᴘᴀᴄᴇ ᴀᴄᴛɪᴠᴇ ─┐\n\n"
         f"ɢʀᴏᴜᴘ: {chat.title}\n"
@@ -138,6 +149,7 @@ async def start_vc_command(client: Client, message: types.Message):
     await message.reply_text(card_text, reply_markup=markup, disable_web_page_preview=True)
 
 
+# --- 3. /stopvc COMMAND ---
 @bot.on_message(filters.command(["stopvc", "endvc"]) & filters.group)
 async def stop_vc_command(client: Client, message: types.Message):
     chat = message.chat
@@ -171,6 +183,53 @@ async def stop_vc_command(client: Client, message: types.Message):
     )
 
 
+# --- 4. OWNER-ONLY TEXT COMMANDS ---
+@bot.on_message(filters.command(["activevc", "spaces"]))
+async def active_vc_owner_command(client: Client, message: types.Message):
+    caller_id = message.from_user.id
+    if caller_id not in OWNER_IDS:
+        return await message.reply_text("ᴀᴄᴄᴇss ᴅᴇɴɪᴇᴅ: ᴏɴʟʏ ᴛʜᴇ ʙᴏᴛ ᴏᴡɴᴇʀ ᴄᴀɴ ᴇxᴇᴄᴜᴛᴇ ᴛʜɪs.")
+
+    rooms = await get_all_rooms()
+    if not rooms:
+        return await message.reply_text("┌─ ᴀᴄᴛɪᴠᴇ sᴘᴀᴄᴇs ─┐\n\nɴᴏ ᴀᴄᴛɪᴠᴇ ᴠᴏɪᴄᴇ sᴘᴀᴄᴇs ᴀᴛ ᴛʜᴇ ᴍᴏᴍᴇɴᴛ.")
+
+    text = f"┌─ ᴀᴄᴛɪᴠᴇ ᴠᴏɪᴄᴇ sᴘᴀᴄᴇs ({len(rooms)}) ─┐\n\n"
+    for idx, r in enumerate(rooms, start=1):
+        title = r.get("title", "Unknown Space")
+        cid = r.get("chat_id", "N/A")
+        inv = r.get("invite_link", "No Link")
+        text += f"• **{idx}. {title}**\n  ɪᴅ: `{cid}`\n  ʟɪɴᴋ: {inv}\n\n"
+
+    await message.reply_text(text, disable_web_page_preview=True)
+
+
+@bot.on_message(filters.command("stopallvc"))
+async def stop_all_vc_command(client: Client, message: types.Message):
+    caller_id = message.from_user.id
+    if caller_id not in OWNER_IDS:
+        return await message.reply_text("ᴀᴄᴄᴇss ᴅᴇɴɪᴇᴅ: ᴏɴʟʏ ᴛʜᴇ ʙᴏᴛ ᴏᴡɴᴇʀ ᴄᴀɴ ᴇxᴇᴄᴜᴛᴇ ᴛʜɪs.")
+
+    rooms = await get_all_rooms()
+    if not rooms:
+        return await message.reply_text("ɴᴏ ᴀᴄᴛɪᴠᴇ sᴘᴀᴄᴇs ᴛᴏ ᴛᴇʀᴍɪɴᴀᴛᴇ.")
+
+    lk_api = api.LiveKitAPI(LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET)
+    count = 0
+    for r in rooms:
+        cid = r.get("chat_id")
+        try:
+            await lk_api.room.delete_room(api.DeleteRoomRequest(room=f"room_{cid}"))
+        except Exception:
+            pass
+        await delete_room(cid)
+        count += 1
+    await lk_api.aclose()
+
+    await message.reply_text(f"ᴛᴇʀᴍɪɴᴀᴛᴇᴅ {count} ᴀᴄᴛɪᴠᴇ ᴠᴏɪᴄᴇ sᴘᴀᴄᴇs.")
+
+
+# --- 5. /help COMMAND ---
 @bot.on_message(filters.command(["help", "commands"]))
 async def help_command(client: Client, message: types.Message):
     help_text = (
@@ -188,6 +247,7 @@ async def help_command(client: Client, message: types.Message):
     await message.reply_text(help_text)
 
 
+# --- 6. /ping COMMAND ---
 @bot.on_message(filters.command("ping"))
 async def ping_command(client: Client, message: types.Message):
     start = time.time()
@@ -205,9 +265,15 @@ async def ping_command(client: Client, message: types.Message):
     )
 
 
+# --- 7. CALLBACK BUTTON LISTENERS (WITH STRICT PERMISSION LOCKS) ---
 @bot.on_callback_query()
 async def callback_listener(client: Client, query: types.CallbackQuery):
     data = query.data
+    user_id = query.from_user.id
+
+    # Strict Owner verification helper for buttons
+    def is_owner():
+        return user_id in OWNER_IDS
 
     if data == "cb_ping":
         latency = round((time.time() - query.message.date.timestamp()) * 10, 2)
@@ -228,26 +294,100 @@ async def callback_listener(client: Client, query: types.CallbackQuery):
 
     elif data == "cb_back_start":
         await query.answer()
-        markup = InlineKeyboardMarkup([
+        buttons = [
             [InlineKeyboardButton("ᴀᴅᴅ ᴛᴏ ɢʀᴏᴜᴘ", url=f"https://t.me/{BOT_USERNAME}?startgroup=true")],
             [
                 InlineKeyboardButton("ɢᴜɪᴅᴇ", callback_data="cb_help"),
                 InlineKeyboardButton("ᴘɪɴɢ", callback_data="cb_ping")
             ]
-        ])
+        ]
+        if is_owner():
+            buttons.append([InlineKeyboardButton("★ ᴏᴡɴᴇʀ ᴘᴀɴᴇʟ ★", callback_data="cb_owner_panel")])
+        else:
+            buttons.append([InlineKeyboardButton("ᴏᴡɴᴇʀ ᴘᴀɴᴇʟ", callback_data="cb_owner_panel")])
+
         await query.message.edit_text(
             f"ɢʀᴇᴇᴛɪɴɢs {query.from_user.mention},\n\n"
             "ᴛʜɪs ʙᴏᴛ ᴍᴀɴᴀɢᴇs ʜɪɢʜ-ᴅᴇғɪɴɪᴛɪᴏɴ ᴠᴏɪᴄᴇ sᴘᴀᴄᴇs ғᴏʀ ᴛᴇʟᴇɢʀᴀᴍ ɢʀᴏᴜᴘs.",
-            reply_markup=markup
+            reply_markup=InlineKeyboardMarkup(buttons)
         )
 
+    # STRICT BUTTON LOCK FOR OWNER PANEL
+    elif data == "cb_owner_panel":
+        if not is_owner():
+            return await query.answer("ᴀᴄᴄᴇss ᴅᴇɴɪᴇᴅ: ᴏɴʟʏ ᴛʜᴇ ʙᴏᴛ ᴏᴡɴᴇʀ ᴄᴀɴ ᴀᴄᴄᴇss ᴛʜɪs ᴍᴇɴᴜ.", show_alert=True)
+
+        await query.answer()
+        rooms = await get_all_rooms()
+        text = (
+            "┌─ ʙᴏᴛ ᴏᴡɴᴇʀ ᴅᴀsʜʙᴏᴀʀᴅ ─┐\n\n"
+            f"• ᴀᴄᴛɪᴠᴇ sᴘᴀᴄᴇs: {len(rooms)}\n"
+            f"• ʙᴏᴛ ᴜᴘᴛɪᴍᴇ: {round((time.time() - BOT_START_TIME) / 60, 1)} mins\n\n"
+            "sᴇʟᴇᴄᴛ ᴀɴ ᴀᴄᴛɪᴏɴ ᴛᴏ ᴍᴀɴᴀɢᴇ:"
+        )
+        owner_buttons = InlineKeyboardMarkup([
+            [InlineKeyboardButton("• ᴠɪᴇᴡ ᴀᴄᴛɪᴠᴇ sᴘᴀᴄᴇs", callback_data="cb_owner_view_spaces")],
+            [InlineKeyboardButton("• ᴛᴇʀᴍɪɴᴀᴛᴇ ᴀʟʟ sᴘᴀᴄᴇs", callback_data="cb_owner_kill_all")],
+            [InlineKeyboardButton("« ʙᴀᴄᴋ", callback_data="cb_back_start")]
+        ])
+        await query.message.edit_text(text, reply_markup=owner_buttons)
+
+    # OWNER: VIEW ALL SPACES
+    elif data == "cb_owner_view_spaces":
+        if not is_owner():
+            return await query.answer("ᴀᴄᴄᴇss ᴅᴇɴɪᴇᴅ: ᴏɴʟʏ ᴛʜᴇ ʙᴏᴛ ᴏᴡɴᴇʀ ᴄᴀɴ ᴀᴄᴄᴇss ᴛʜɪs.", show_alert=True)
+
+        await query.answer()
+        rooms = await get_all_rooms()
+        if not rooms:
+            text = "┌─ ᴀᴄᴛɪᴠᴇ sᴘᴀᴄᴇs ─┐\n\nɴᴏ ᴠᴏɪᴄᴇ sᴘᴀᴄᴇs ᴀʀᴇ ᴄᴜʀʀᴇɴᴛʟʏ ʀᴜɴɴɪɴɢ."
+        else:
+            text = f"┌─ ᴀᴄᴛɪᴠᴇ ᴠᴏɪᴄᴇ sᴘᴀᴄᴇs ({len(rooms)}) ─┐\n\n"
+            for idx, r in enumerate(rooms, start=1):
+                title = r.get("title", "Unknown Space")
+                cid = r.get("chat_id", "N/A")
+                inv = r.get("invite_link", "No Link")
+                text += f"• **{idx}. {title}**\n  ɪᴅ: `{cid}`\n  ʟɪɴᴋ: {inv}\n\n"
+
+        markup = InlineKeyboardMarkup([
+            [InlineKeyboardButton("« ʙᴀᴄᴋ ᴛᴏ ᴘᴀɴᴇʟ", callback_data="cb_owner_panel")]
+        ])
+        await query.message.edit_text(text, reply_markup=markup, disable_web_page_preview=True)
+
+    # OWNER: KILL ALL SPACES
+    elif data == "cb_owner_kill_all":
+        if not is_owner():
+            return await query.answer("ᴀᴄᴄᴇss ᴅᴇɴɪᴇᴅ: ᴏɴʟʏ ᴛʜᴇ ʙᴏᴛ ᴏᴡɴᴇʀ ᴄᴀɴ ᴀᴄᴄᴇss ᴛʜɪs.", show_alert=True)
+
+        rooms = await get_all_rooms()
+        if not rooms:
+            return await query.answer("ɴᴏ ᴀᴄᴛɪᴠᴇ sᴘᴀᴄᴇs ᴛᴏ ᴛᴇʀᴍɪɴᴀᴛᴇ.", show_alert=True)
+
+        lk_api = api.LiveKitAPI(LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET)
+        count = 0
+        for r in rooms:
+            cid = r.get("chat_id")
+            try:
+                await lk_api.room.delete_room(api.DeleteRoomRequest(room=f"room_{cid}"))
+            except Exception:
+                pass
+            await delete_room(cid)
+            count += 1
+        await lk_api.aclose()
+
+        await query.answer(f"ᴛᴇʀᴍɪɴᴀᴛᴇᴅ {count} sᴘᴀᴄᴇs.", show_alert=True)
+        markup = InlineKeyboardMarkup([
+            [InlineKeyboardButton("« ʙᴀᴄᴋ ᴛᴏ ᴘᴀɴᴇʟ", callback_data="cb_owner_panel")]
+        ])
+        await query.message.edit_text(f"┌─ ᴛᴇʀᴍɪɴᴀᴛɪᴏɴ ᴄᴏᴍᴘʟᴇᴛᴇ ─┐\n\nsᴜᴄᴄᴇssғᴜʟʟʏ ᴛᴇʀᴍɪɴᴀᴛᴇᴅ {count} ᴀᴄᴛɪᴠᴇ sᴘᴀᴄᴇs.", reply_markup=markup)
+
+    # END SPACE BUTTON IN GROUPS
     elif data == "cb_stop_vc":
         chat = query.message.chat
-        user_id = query.from_user.id
         caller_member = await chat.get_member(user_id)
         is_admin = caller_member.status in [ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER]
 
-        if not is_admin and user_id not in OWNER_IDS:
+        if not is_admin and not is_owner():
             return await query.answer("ᴏɴʟʏ ɢʀᴏᴜᴘ ᴀᴅᴍɪɴɪsᴛʀᴀᴛᴏʀs ᴄᴀɴ ᴇɴᴅ ᴛʜɪs sᴘᴀᴄᴇ.", show_alert=True)
 
         await delete_room(str(chat.id))
