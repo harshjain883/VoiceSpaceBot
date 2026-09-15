@@ -61,6 +61,45 @@
             border-color: #22c55e !important;
             box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.4), 0 0 20px rgba(34, 197, 94, 0.6) !important;
         }
+
+        /* Scrollable Emoji Bar */
+        .reaction-bar-scroll {
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+        .reaction-bar-scroll::-webkit-scrollbar {
+            display: none;
+        }
+
+        /* Floating Reaction Physics */
+        .floating-reaction {
+            position: absolute;
+            bottom: 25px;
+            font-size: 28px;
+            pointer-events: none;
+            z-index: 50;
+            will-change: transform, opacity;
+            animation: floatUpAndFade 1.8s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
+        }
+
+        @keyframes floatUpAndFade {
+            0% {
+                opacity: 0;
+                transform: translateY(0) scale(0.4) rotate(0deg);
+            }
+            15% {
+                opacity: 1;
+                transform: translateY(-20px) scale(1.4) rotate(-6deg);
+            }
+            60% {
+                opacity: 0.95;
+                transform: translateY(-70px) scale(1.15) rotate(6deg);
+            }
+            100% {
+                opacity: 0;
+                transform: translateY(-130px) scale(0.9) rotate(-4deg);
+            }
+        }
     </style>
 </head>
 <body class="h-screen flex flex-col justify-between p-4 select-none relative overflow-hidden" onclick="resumeAudioContext()">
@@ -88,9 +127,9 @@
         <div id="grid" class="w-full h-full max-h-[46vh] grid grid-cols-3 gap-y-6 gap-x-4 auto-rows-max overflow-y-auto px-2 items-start justify-center"></div>
     </main>
 
-    <div id="live-chat-overlay" class="absolute bottom-28 left-4 right-4 z-20 flex flex-col items-center justify-end space-y-2 pointer-events-none max-h-44 overflow-hidden"></div>
+    <div id="live-chat-overlay" class="absolute bottom-36 left-4 right-4 z-20 flex flex-col items-center justify-end space-y-2 pointer-events-none max-h-44 overflow-hidden"></div>
 
-    <div id="chat-input-bar" class="hidden absolute bottom-28 left-4 right-4 z-30 pointer-events-auto">
+    <div id="chat-input-bar" class="hidden absolute bottom-36 left-4 right-4 z-30 pointer-events-auto">
         <form onsubmit="handleSendChat(event)" class="glass-panel p-2 rounded-2xl flex gap-2 shadow-2xl">
             <input id="chat-input" type="text" placeholder="Type a message into voice chat..." autocomplete="off" class="flex-1 px-4 py-2.5 rounded-xl dark:bg-slate-900 bg-white border border-white/10 dark:text-white text-slate-900 text-xs outline-none focus:border-sky-500">
             <button type="submit" class="px-4 py-2.5 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-semibold active:scale-95 transition">Send</button>
@@ -99,21 +138,39 @@
 
     <div id="error-banner" class="hidden glass-pill bg-rose-500/20 text-rose-400 text-xs px-4 py-2 rounded-xl text-center mb-2 relative z-10 mx-auto max-w-xs shadow-lg"></div>
 
+    <!-- Scrollable Live Reaction Emojis Bar (15 Reactions) -->
+    <div class="w-full max-w-sm mx-auto px-2 mb-2 z-20">
+        <div class="reaction-bar-scroll flex items-center gap-2 overflow-x-auto py-1.5 px-3 glass-panel rounded-full shadow-lg border border-white/10">
+            <button onclick="sendReaction('❤️')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">❤️</button>
+            <button onclick="sendReaction('🔥')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">🔥</button>
+            <button onclick="sendReaction('👏')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">👏</button>
+            <button onclick="sendReaction('😂')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">😂</button>
+            <button onclick="sendReaction('🚀')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">🚀</button>
+            <button onclick="sendReaction('🎉')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">🎉</button>
+            <button onclick="sendReaction('😍')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">😍</button>
+            <button onclick="sendReaction('💯')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">💯</button>
+            <button onclick="sendReaction('⚡')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">⚡</button>
+            <button onclick="sendReaction('😎')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">😎</button>
+            <button onclick="sendReaction('🥳')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">🥳</button>
+            <button onclick="sendReaction('🤯')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">🤯</button>
+            <button onclick="sendReaction('✨')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">✨</button>
+            <button onclick="sendReaction('👍')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">👍</button>
+            <button onclick="sendReaction('🫡')" class="text-xl active:scale-75 hover:scale-125 transition shrink-0">🫡</button>
+        </div>
+    </div>
+
     <!-- Dock Controls -->
     <footer class="aesthetic-dock w-full max-w-sm mx-auto px-4 py-3 flex items-center justify-between relative z-10 mb-2">
         
-        <!-- 3-Way Instant Audio Router -->
+        <!-- Audio Routing Button (Speaker / Bluetooth / Earpiece) -->
         <div class="flex flex-col items-center gap-1.5 flex-1">
             <button id="spk-btn" onclick="cycleAudioRoute()" class="w-12 h-12 rounded-full bg-sky-500/15 dark:bg-sky-400/20 text-sky-600 dark:text-sky-400 border border-sky-500/30 flex items-center justify-center shadow-sm active:scale-90 transition">
-                <!-- Loudspeaker Icon -->
                 <svg id="icon-speaker" class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
                 </svg>
-                <!-- Bluetooth Icon -->
                 <svg id="icon-bluetooth" class="w-5 h-5 hidden" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M17.71 7.71L12 2h-1v7.59L6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 11 14.41V22h1l5.71-5.71-4.3-4.29 4.3-4.29zM13 5.83l1.88 1.88L13 9.59V5.83zm1.88 10.46L13 18.17v-3.76l1.88 1.88z"/>
                 </svg>
-                <!-- Earpiece Icon -->
                 <svg id="icon-earpiece" class="w-5 h-5 hidden" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M6.62 10.79a15.053 15.053 0 006.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/>
                 </svg>
@@ -153,7 +210,7 @@
 
     </footer>
 
-    <!-- In-App Dialog -->
+    <!-- Custom In-App Modal -->
     <div id="custom-app-dialog" class="hidden fixed inset-0 z-50 bg-black/65 backdrop-blur-sm flex items-center justify-center p-5">
         <div class="glass-panel p-5 rounded-3xl max-w-xs w-full text-left space-y-3 shadow-2xl border border-white/10">
             <div class="flex items-center justify-between">
@@ -231,13 +288,10 @@
         let participantStates = {};
         let userVolumes = {};
 
-        // HARDWARE ROUTE STATES
-        let currentRoute = 'speaker'; // 'speaker' (Loud) | 'bluetooth' | 'earpiece' (Call)
+        let currentRoute = 'speaker'; // 'speaker' | 'bluetooth' | 'earpiece'
         let cachedDevices = { bluetooth: null, speaker: null, earpiece: null };
 
-        // WEB AUDIO CONTEXT (Forces Android OS out of phone-call mode to Speaker)
         let audioCtx = null;
-
         function getAudioContext() {
             if (!audioCtx) {
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -262,7 +316,47 @@
 
         function getLiveKit() { return window.LivekitClient || window.livekit || window.LiveKit; }
 
-        // HARDWARE AUDIO DETECTION
+        // LIVE REACTION FUNCTIONS
+        function sendReaction(emoji) {
+            if (!room || !room.localParticipant) return;
+            const myId = String(room.localParticipant.identity);
+
+            triggerAvatarEmoji(myId, emoji);
+
+            const payload = JSON.stringify({
+                type: "LIVE_REACTION",
+                senderId: myId,
+                emoji: emoji
+            });
+
+            try {
+                room.localParticipant.publishData(new TextEncoder().encode(payload), {
+                    reliable: false
+                });
+            } catch (e) {
+                console.warn("Reaction publish error:", e);
+            }
+        }
+
+        function triggerAvatarEmoji(userId, emoji) {
+            const avatarBubble = document.getElementById(`user-${userId}`);
+            if (!avatarBubble) return;
+
+            const el = document.createElement("div");
+            el.className = "floating-reaction";
+            el.innerText = emoji;
+
+            const randomOffset = Math.floor(Math.random() * 24) - 12;
+            el.style.left = `calc(50% + ${randomOffset}px - 14px)`;
+
+            avatarBubble.parentElement.style.position = "relative";
+            avatarBubble.parentElement.appendChild(el);
+
+            setTimeout(() => {
+                if (el.parentNode) el.parentNode.removeChild(el);
+            }, 1800);
+        }
+
         async function refreshAudioDevices() {
             if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
             try {
@@ -286,7 +380,6 @@
                     cachedDevices.speaker = outputs.find(d => d.deviceId === 'default') || outputs[0];
                 }
 
-                // Auto-set Initial Route: Bluetooth agar ho toh Bluetooth, warna Loudspeaker
                 if (cachedDevices.bluetooth) {
                     currentRoute = 'bluetooth';
                 } else if (currentRoute === 'bluetooth') {
@@ -300,7 +393,6 @@
             }
         }
 
-        // 3-WAY CYCLE
         async function cycleAudioRoute() {
             if (cachedDevices.bluetooth) {
                 if (currentRoute === 'bluetooth') currentRoute = 'speaker';
@@ -341,12 +433,9 @@
             }
         }
 
-        // CRITICAL ENGINE: MOBILE ANDROID HARDWARE AUDIO SWITCH
         async function applyHardwareRouting() {
             const audios = document.querySelectorAll('#remote-audio-container audio');
-            const ctx = getAudioContext();
 
-            // 1. LiveKit Official Hardware Switch (agar support karta ho)
             if (room && room.switchActiveDevice) {
                 let targetId = "default";
                 if (currentRoute === 'bluetooth' && cachedDevices.bluetooth) {
@@ -361,10 +450,8 @@
                 } catch(e) {}
             }
 
-            // 2. Direct HTML5 Elements Sink Routing
             for (const a of audios) {
                 if (currentRoute === 'speaker') {
-                    // Force Loudspeaker: Clear sink and play via standard media stream
                     if (a.setSinkId) {
                         try {
                             const spkId = cachedDevices.speaker ? cachedDevices.speaker.deviceId : "default";
@@ -458,7 +545,11 @@
                         const msg = JSON.parse(new TextDecoder().decode(payload));
                         const myId = String(room.localParticipant.identity);
 
-                        if (msg.type === "MOD_STATE_CHANGE") {
+                        if (msg.type === "LIVE_REACTION") {
+                            if (msg.senderId !== myId) {
+                                triggerAvatarEmoji(msg.senderId, msg.emoji);
+                            }
+                        } else if (msg.type === "MOD_STATE_CHANGE") {
                             participantStates[msg.targetId] = msg.state;
                             renderUsers();
 
@@ -503,7 +594,6 @@
             }
         }
 
-        // HARDWARE LEAK-PROOF MIC TOGGLE
         async function toggleMic() {
             if (!room) return;
             if (amIHardLocked) {
@@ -527,7 +617,6 @@
                     }
                     updateMicUI();
                     
-                    // Microphone allow hote hi phone ke actual hardware names unlock ho jaate hain
                     await refreshAudioDevices();
                     return;
                 } catch (err) {
@@ -537,14 +626,12 @@
             }
 
             if (isMuted) {
-                // UNMUTE
                 if (localAudioTrack.mediaStreamTrack) {
                     localAudioTrack.mediaStreamTrack.enabled = true;
                 }
                 await localAudioTrack.unmute();
                 isMuted = false;
             } else {
-                // MUTE: LiveKit Mute + Raw Hardware Track Disable (0% leak)
                 if (localAudioTrack.mediaStreamTrack) {
                     localAudioTrack.mediaStreamTrack.enabled = false;
                 }
@@ -573,7 +660,7 @@
                 btn.classList.remove('mic-speaking-glow');
             } else {
                 btn.className = "w-16 h-16 rounded-full bg-gradient-to-tr from-emerald-500 to-emerald-400 text-white flex items-center justify-center shadow-lg shadow-emerald-500/35 active:scale-95 transition relative border-2 border-white/40 dark:border-white/20";
-                icon.innerHTML = `<path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>`;
+                icon.innerHTML = `<path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>`;
                 label.innerText = "You're Live";
 
                 if (isSpeakingNow) {
