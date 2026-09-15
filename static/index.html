@@ -373,13 +373,35 @@
                 room.on(LK.RoomEvent.ParticipantDisconnected, renderUsers);
                 room.on(LK.RoomEvent.ActiveSpeakersChanged, handleSpeakers);
 
-                room.on(LK.RoomEvent.DataReceived, (payload) => {
+                // REAL-TIME SIGNAL DISPATCHER (Lock Mic, Kick, Volume, Chat)
+                room.on(LK.RoomEvent.DataReceived, async (payload) => {
                     try {
                         const msgObj = JSON.parse(new TextDecoder().decode(payload));
                         
-                        if (msgObj.type === "GLOBAL_VOLUME_ADJUST") {
+                        // 1. Admin Mic Lock
+                        if (msgObj.type === "ADMIN_LOCK_MIC") {
+                            if (msgObj.targetId === String(room.localParticipant.identity)) {
+                                if (localAudioTrack) {
+                                    await localAudioTrack.mute();
+                                }
+                                isMuted = true;
+                                updateMicUI();
+                                alert("An Administrator has locked your microphone.");
+                            }
+                        }
+                        // 2. Admin Kick
+                        else if (msgObj.type === "ADMIN_KICK") {
+                            if (msgObj.targetId === String(room.localParticipant.identity)) {
+                                alert("You have been removed from the Voice Space by Admin.");
+                                leaveSpace();
+                            }
+                        }
+                        // 3. Global Volume Adjust
+                        else if (msgObj.type === "GLOBAL_VOLUME_ADJUST") {
                             applyAudioVolumeLocally(msgObj.targetId, msgObj.volume);
-                        } else {
+                        } 
+                        // 4. In-room Chat
+                        else {
                             displayFloatingMessage(msgObj.name, msgObj.photo_url, msgObj.text);
                         }
                     } catch(e) {}
@@ -550,6 +572,7 @@
             }
         }
 
+        // STEP 2: SAFE REAL-TIME MODERATION ACTION HANDLER
         async function moderateUserAction(targetId, action) {
             try {
                 const res = await fetch('/api/moderate-user', {
@@ -562,14 +585,28 @@
                         action: action
                     })
                 });
-                const data = await res.json();
+
+                const resText = await res.text();
+                let data = {};
+                try { data = JSON.parse(resText); } catch(_) { data = { detail: resText }; }
+
                 if (!res.ok) {
-                    alert(data.detail || "Action failed");
-                } else {
-                    closeProfileModal();
+                    return alert(data.detail || "Action failed");
                 }
+
+                // Instant DataChannel Broadcast to Target User
+                if (room) {
+                    const signal = JSON.stringify({
+                        type: action === "mute" ? "ADMIN_LOCK_MIC" : (action === "kick" ? "ADMIN_KICK" : "ADMIN_UNLOCK_MIC"),
+                        targetId: String(targetId)
+                    });
+                    room.localParticipant.publishData(new TextEncoder().encode(signal), { reliable: true });
+                }
+
+                closeProfileModal();
             } catch(e) {
-                alert("Network error executing action");
+                console.error("Moderation error:", e);
+                alert("Action error: " + (e.message || "Request failed"));
             }
         }
 
