@@ -37,8 +37,8 @@
         <div class="flex items-center gap-3 overflow-hidden">
             <span id="status-dot" class="w-3 h-3 rounded-full bg-amber-400 shrink-0 animate-pulse"></span>
             <div class="flex flex-col truncate">
-                <span class="text-sm font-bold text-white truncate" id="group-title">Connecting...</span>
-                <span class="text-[10px] text-slate-400" id="connection-state">Connecting space...</span>
+                <span class="text-sm font-bold text-white truncate" id="group-title">Loading...</span>
+                <span class="text-[10px] text-slate-400" id="connection-state">Connecting...</span>
             </div>
         </div>
         
@@ -68,8 +68,8 @@
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 8l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M5 3a2 2 0 00-2 2v1c0 8.284 6.716 15 15 15h1a2 2 0 002-2v-3.28a1 1 0 00-.684-.948l-4.493-1.498a1 1 0 00-1.21.502l-1.13 2.257a11.042 11.042 0 01-5.516-5.517l2.257-1.128a1 1 0 00.502-1.21L9.228 3.683A1 1 0 008.279 3H5z"/></svg>
         </button>
 
-        <!-- Mic Toggle -->
-        <button id="mic-btn" onclick="toggleMic()" class="w-14 h-14 rounded-full bg-indigo-600 text-white flex items-center justify-center shadow-lg active:scale-95 transition">
+        <!-- Mic Toggle (Tap to Speak - Requests permission ONCE) -->
+        <button id="mic-btn" onclick="toggleMic()" class="w-14 h-14 rounded-full bg-rose-600 text-white flex items-center justify-center shadow-lg active:scale-95 transition">
             <svg id="mic-icon" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 02-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/></svg>
         </button>
 
@@ -79,10 +79,10 @@
         </button>
     </footer>
 
-    <!-- Chat Drawer -->
+    <!-- In-Room Chat Drawer -->
     <div id="chat-drawer" class="hidden absolute inset-0 bg-slate-950/95 backdrop-blur-xl z-50 flex flex-col p-4 transition-all">
         <div class="flex items-center justify-between pb-3 border-b border-white/10">
-            <h3 class="font-bold text-sm text-slate-100" id="chat-group-name">In-Room Chat</h3>
+            <h3 class="font-bold text-sm text-slate-100 truncate" id="chat-group-name">Chat</h3>
             <button onclick="toggleChat()" class="p-1 text-slate-400 hover:text-white rounded bg-white/5">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
@@ -102,7 +102,7 @@
         }
 
         let room = null;
-        let isMuted = false;
+        let isMuted = true; // Start muted to eliminate initial prompt popup
         let isSpeakerOn = true;
         let isChatOpen = false;
 
@@ -123,11 +123,11 @@
 
         async function startVoiceSession() {
             if (!rawId) {
-                return showError("Session ID missing. Please join using the link in group.");
+                return showError("Missing session parameter. Launch via group link.");
             }
 
             const LK = getLiveKit();
-            if (!LK) return showError("Audio library load failed. Please reopen.");
+            if (!LK) return showError("Library loading failed. Please reopen.");
 
             try {
                 document.getElementById('connection-state').innerText = "Authenticating...";
@@ -147,9 +147,12 @@
                 }
 
                 const data = await res.json();
-                document.getElementById('group-title').innerText = data.group_title || "Voice Space";
-                document.getElementById('chat-group-name').innerText = data.group_title || "In-Room Chat";
-                document.getElementById('connection-state').innerText = "Joining SFU...";
+                
+                // Set accurate group title everywhere
+                const groupTitle = data.group_title || "Voice Space";
+                document.getElementById('group-title').innerText = groupTitle;
+                document.getElementById('chat-group-name').innerText = groupTitle;
+                document.getElementById('connection-state').innerText = "Connecting...";
 
                 room = new LK.Room({
                     adaptiveStream: true,
@@ -175,22 +178,13 @@
                     } catch(e) {}
                 });
 
-                // Connect to LiveKit Room
+                // Connect to SFU
                 await room.connect(data.livekit_url, data.token);
-
-                // Publish Mic (non-blocking fallback)
-                try {
-                    await room.localParticipant.setMicrophoneEnabled(true);
-                    isMuted = false;
-                } catch(e) {
-                    console.warn("Mic permission deferred:", e);
-                    isMuted = true;
-                }
-                updateMicUI();
 
                 document.getElementById('connection-state').innerText = "Connected";
                 document.getElementById('status-dot').className = "w-3 h-3 rounded-full bg-emerald-400 shrink-0";
 
+                updateMicUI();
                 renderUsers();
             } catch (err) {
                 console.error(err);
@@ -249,10 +243,16 @@
             });
         }
 
+        // Single explicit user-gesture trigger for microphone
         async function toggleMic() {
             if (!room) return;
-            isMuted = !isMuted;
-            await room.localParticipant.setMicrophoneEnabled(!isMuted);
+            try {
+                isMuted = !isMuted;
+                await room.localParticipant.setMicrophoneEnabled(!isMuted);
+            } catch(err) {
+                console.error("Mic toggle permission error:", err);
+                isMuted = true;
+            }
             updateMicUI();
         }
 
