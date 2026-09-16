@@ -119,6 +119,13 @@
         .reaction-bar-scroll::-webkit-scrollbar {
             display: none;
         }
+
+        /* Telegram Style Floating Mic Badge */
+        .tg-mic-badge {
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            transition: all 0.2s ease;
+        }
     </style>
 </head>
 <body class="h-screen flex flex-col justify-between p-4 select-none relative overflow-hidden" onclick="handleBodyClick(event)">
@@ -133,7 +140,6 @@
             <div id="group-avatar-container" class="relative w-9 h-9 rounded-full overflow-hidden shrink-0 border border-white/15 shadow-sm bg-slate-800 flex items-center justify-center">
                 <span id="group-fallback-initial" class="font-bold text-sm bg-gradient-to-tr from-sky-400 to-indigo-400 bg-clip-text text-transparent">G</span>
                 <img id="group-avatar-img" class="w-full h-full object-cover hidden" alt="Group DP">
-                <!-- Status Dot Pin to Group DP -->
                 <span id="status-dot" class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-amber-400 border-2 border-[#141a26] shrink-0 animate-pulse"></span>
             </div>
 
@@ -300,6 +306,7 @@
         let amIHardLocked = false;
         let participantStates = {};
         let userVolumes = {};
+        let activeSpeakerIds = new Set(); // Real-time speaking tracker
 
         let currentRoute = 'speaker';
         let cachedDevices = { bluetooth: null, speaker: null, earpiece: null };
@@ -643,11 +650,9 @@
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.detail || "Authentication Failed");
 
-                // 1. Group Title Update
                 const groupTitle = data.group_title || "Voice Space";
                 document.getElementById('group-title').innerText = groupTitle;
 
-                // 2. Group Profile Photo Update
                 const avatarImg = document.getElementById('group-avatar-img');
                 const fallbackInitial = document.getElementById('group-fallback-initial');
 
@@ -693,9 +698,16 @@
                         applyHardwareRouting();
                         audioEl.play().catch(() => {});
                     }
+                    renderUsers();
                 });
 
-                room.on(LK.RoomEvent.TrackUnsubscribed, track => track.detach().forEach(el => el.remove()));
+                room.on(LK.RoomEvent.TrackUnsubscribed, track => {
+                    track.detach().forEach(el => el.remove());
+                    renderUsers();
+                });
+
+                room.on(LK.RoomEvent.TrackMuted, renderUsers);
+                room.on(LK.RoomEvent.TrackUnmuted, renderUsers);
                 room.on(LK.RoomEvent.ParticipantConnected, renderUsers);
                 room.on(LK.RoomEvent.ParticipantDisconnected, renderUsers);
                 room.on(LK.RoomEvent.ActiveSpeakersChanged, handleSpeakers);
@@ -723,10 +735,12 @@
                                     isMuted = true;
                                     isSpeakingNow = false;
                                     updateMicUI();
+                                    renderUsers();
                                     showAppDialog("An Administrator has locked your microphone.");
                                 } else {
                                     amIHardLocked = false;
                                     updateMicUI();
+                                    renderUsers();
                                     showAppDialog("Your microphone has been unlocked. You can unmute now.");
                                 }
                             }
@@ -774,6 +788,7 @@
                         localAudioTrack.mediaStreamTrack.enabled = true;
                     }
                     updateMicUI();
+                    renderUsers();
                     
                     await refreshAudioDevices();
                     return;
@@ -799,6 +814,7 @@
             }
 
             updateMicUI();
+            renderUsers();
         }
 
         function updateMicUI() {
@@ -829,6 +845,9 @@
             }
         }
 
+        // ==============================================================
+        // TELEGRAM EXACT NATIVE MIC STATES (4 Clean Distinguishable Styles)
+        // ==============================================================
         function renderUsers() {
             if (!room) return;
             const grid = document.getElementById('grid');
@@ -843,6 +862,18 @@
 
                 if (p === room.localParticipant && meta.photo_url) myPhotoUrl = meta.photo_url;
 
+                const isHardMuted = Boolean(state.is_muted);
+                let isMicOn = false;
+
+                if (p === room.localParticipant) {
+                    isMicOn = !isMuted && !isHardMuted;
+                } else {
+                    const audioPub = Array.from(p.audioTracks.values())[0];
+                    isMicOn = Boolean(audioPub && !audioPub.isMuted && !isHardMuted);
+                }
+
+                const isTalking = activeSpeakerIds.has(String(p.identity)) && isMicOn;
+
                 const card = document.createElement('div');
                 card.className = "flex flex-col items-center gap-1.5 cursor-pointer";
                 card.onclick = () => openProfileModal(p, meta, state);
@@ -850,6 +881,10 @@
                 const bubble = document.createElement('div');
                 bubble.id = `user-${p.identity}`;
                 bubble.className = `relative w-16 h-16 rounded-full border-2 ${meta.is_owner ? 'border-amber-400' : (meta.is_admin ? 'border-sky-400' : 'border-slate-300 dark:border-white/10')} flex items-center justify-center bg-slate-200 dark:bg-slate-800 overflow-visible shadow-md`;
+
+                if (isTalking) {
+                    bubble.classList.add('speaking-ring');
+                }
 
                 const imgBox = document.createElement('div');
                 imgBox.className = "w-full h-full rounded-full overflow-hidden flex items-center justify-center";
@@ -860,11 +895,34 @@
                 }
                 bubble.appendChild(imgBox);
 
-                if (state.is_muted) {
-                    const muteBadge = document.createElement('div');
-                    muteBadge.className = "absolute -bottom-1 -right-1 bg-rose-600 rounded-full p-1 border-2 border-white dark:border-[#0c1017] shadow-lg flex items-center justify-center";
-                    muteBadge.innerHTML = `<svg class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.12c0-.04.02-.08.02-.12V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.94zM4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.33 3 2.99 3 .22 0 .44-.03.65-.08l1.66 1.66c-.71.33-1.5.52-2.31.52-2.76 0-5.3-2.1-5.3-5.1H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c.91-.13 1.77-.45 2.54-.9L19.73 21 21 19.73 4.27 3z"/></svg>`;
-                    bubble.appendChild(muteBadge);
+                // BOT OWNER KO CHHOD KAR TELEGRAM NATIVE MIC BADGE
+                if (!meta.is_owner) {
+                    const badge = document.createElement('div');
+                    badge.className = "absolute -bottom-1 -right-1 rounded-full p-1 border-2 border-white dark:border-[#0c1017] shadow-lg flex items-center justify-center tg-mic-badge";
+
+                    if (isHardMuted) {
+                        // 1. ADMIN LOCKED (Red with Slash - Jaise opus . s)
+                        badge.className += " bg-rose-600 text-white";
+                        badge.title = "Muted by Admin";
+                        badge.innerHTML = `<svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.12c0-.04.02-.08.02-.12V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.94zM4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.33 3 2.99 3 .22 0 .44-.03.65-.08l1.66 1.66c-.71.33-1.5.52-2.31.52-2.76 0-5.3-2.1-5.3-5.1H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c.91-.13 1.77-.45 2.54-.9L19.73 21 21 19.73 4.27 3z"/></svg>`;
+                    } else if (isTalking) {
+                        // 2. ACTIVE SPEAKING (Green with Pulse - Jaise PANDA)
+                        badge.className += " bg-emerald-500 text-white shadow-emerald-500/50";
+                        badge.title = "Speaking Now";
+                        badge.innerHTML = `<svg class="w-3 h-3 animate-pulse" fill="currentColor" viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>`;
+                    } else if (isMicOn) {
+                        // 3. UNMUTED BUT SILENT (Clean Outline/White Mic - Jaise Crazyboy)
+                        badge.className += " bg-slate-700/90 text-slate-100 border border-white/20";
+                        badge.title = "Unmuted (Silent)";
+                        badge.innerHTML = `<svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>`;
+                    } else {
+                        // 4. USER SELF MUTED (Dark Grey with Slash - Jaise this is you)
+                        badge.className += " bg-slate-800/90 text-slate-400 border border-white/10";
+                        badge.title = "Muted by Self";
+                        badge.innerHTML = `<svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.12c0-.04.02-.08.02-.12V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.94zM4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.33 3 2.99 3 .22 0 .44-.03.65-.08l1.66 1.66c-.71.33-1.5.52-2.31.52-2.76 0-5.3-2.1-5.3-5.1H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c.91-.13 1.77-.45 2.54-.9L19.73 21 21 19.73 4.27 3z"/></svg>`;
+                    }
+
+                    bubble.appendChild(badge);
                 }
 
                 const label = document.createElement('span');
@@ -875,6 +933,22 @@
                 card.appendChild(label);
                 grid.appendChild(card);
             });
+        }
+
+        function handleSpeakers(speakers) {
+            activeSpeakerIds.clear();
+            let amISpeaking = false;
+
+            speakers.forEach(s => {
+                activeSpeakerIds.add(String(s.identity));
+                if (room && String(s.identity) === String(room.localParticipant.identity)) {
+                    amISpeaking = true;
+                }
+            });
+
+            isSpeakingNow = amISpeaking && !isMuted;
+            updateMicUI();
+            renderUsers();
         }
 
         function openProfileModal(p, meta, state) {
@@ -995,28 +1069,6 @@
             } catch(e) {
                 showAppDialog("Network error executing action");
             }
-        }
-
-        function handleSpeakers(speakers) {
-            document.querySelectorAll('[id^="user-"]').forEach(el => {
-                el.classList.remove('speaking-ring');
-            });
-
-            let amISpeaking = false;
-
-            speakers.forEach(s => {
-                const bubble = document.getElementById(`user-${s.identity}`);
-                if (bubble) {
-                    bubble.classList.add('speaking-ring');
-                }
-
-                if (room && String(s.identity) === String(room.localParticipant.identity)) {
-                    amISpeaking = true;
-                }
-            });
-
-            isSpeakingNow = amISpeaking && !isMuted;
-            updateMicUI();
         }
 
         async function leaveSpace() {
