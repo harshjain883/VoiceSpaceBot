@@ -22,7 +22,6 @@
         html.dark .glass-pill { background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.08); }
         html.light .glass-pill { background: rgba(0, 0, 0, 0.04); border: 1px solid rgba(0, 0, 0, 0.06); }
 
-        /* Telegram Native Floating Chat Pill */
         .tg-chat-bubble {
             animation: slideUpPill 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
             background: rgba(23, 30, 42, 0.92);
@@ -35,7 +34,6 @@
             to { opacity: 1; transform: translateY(0); } 
         }
 
-        /* NATIVE 1:1 WEBP EMOJI */
         .realistic-emoji-img {
             width: 32px;
             height: 32px;
@@ -44,7 +42,6 @@
             filter: drop-shadow(0 2px 5px rgba(0,0,0,0.3));
         }
 
-        /* VERTICAL 3D CAROUSEL SINGLE-LINE STRIP */
         .single-line-carousel {
             height: 48px;
             overflow-y: auto;
@@ -53,9 +50,7 @@
             -ms-overflow-style: none;
             perspective: 600px;
         }
-        .single-line-carousel::-webkit-scrollbar {
-            display: none;
-        }
+        .single-line-carousel::-webkit-scrollbar { display: none; }
 
         .carousel-row {
             height: 48px;
@@ -65,7 +60,6 @@
             justify-content: space-between;
             gap: 8px;
             width: 100%;
-            transition: transform 0.2s ease, opacity 0.2s ease;
         }
 
         .dock-emoji-btn {
@@ -75,11 +69,8 @@
             align-items: center;
             justify-content: center;
             flex-shrink: 0;
-            transition: transform 0.15s ease;
         }
-        .dock-emoji-btn:active {
-            transform: scale(0.9);
-        }
+        .dock-emoji-btn:active { transform: scale(0.9); }
 
         .aesthetic-dock {
             backdrop-filter: blur(20px);
@@ -112,15 +103,6 @@
             box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.4), 0 0 20px rgba(34, 197, 94, 0.6) !important;
         }
 
-        .reaction-bar-scroll {
-            scrollbar-width: none;
-            -ms-overflow-style: none;
-        }
-        .reaction-bar-scroll::-webkit-scrollbar {
-            display: none;
-        }
-
-        /* Telegram Style Floating Mic Badge */
         .tg-mic-badge {
             backdrop-filter: blur(8px);
             -webkit-backdrop-filter: blur(8px);
@@ -135,8 +117,6 @@
     <!-- Header Bar With Group Picture & Title -->
     <header class="glass-panel p-2.5 px-3.5 rounded-2xl flex items-center justify-between shadow-xl relative z-10">
         <div class="flex items-center gap-3 overflow-hidden">
-            
-            <!-- Group Picture / Fallback Initial -->
             <div id="group-avatar-container" class="relative w-9 h-9 rounded-full overflow-hidden shrink-0 border border-white/15 shadow-sm bg-slate-800 flex items-center justify-center">
                 <span id="group-fallback-initial" class="font-bold text-sm bg-gradient-to-tr from-sky-400 to-indigo-400 bg-clip-text text-transparent">G</span>
                 <img id="group-avatar-img" class="w-full h-full object-cover hidden" alt="Group DP">
@@ -167,15 +147,12 @@
 
     <!-- COMBINED MESSAGE & 3D SINGLE-LINE VERTICAL REEL DRAWER -->
     <div id="message-drawer" class="hidden absolute bottom-24 left-4 right-4 z-30 flex flex-col gap-2 pointer-events-auto">
-        
-        <!-- Single-Line Vertical Reel -->
         <div class="w-full max-w-sm mx-auto px-1">
             <div class="glass-panel rounded-full shadow-lg border border-white/10 px-3 py-1">
                 <div id="emoji-picker-container" class="single-line-carousel"></div>
             </div>
         </div>
 
-        <!-- Text Chat Input Form -->
         <form id="chat-form" onsubmit="handleSendChat(event)" class="glass-panel p-2 rounded-2xl flex gap-2 shadow-2xl max-w-sm mx-auto w-full">
             <input id="chat-input" type="text" placeholder="Type message or swipe emojis..." autocomplete="off" class="flex-1 px-4 py-2.5 rounded-xl dark:bg-slate-900 bg-white border border-white/10 dark:text-white text-slate-900 text-xs outline-none focus:border-sky-500">
             <button type="submit" onmousedown="preventInputBlur(event)" class="px-4 py-2.5 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-semibold active:scale-95 transition">Send</button>
@@ -279,7 +256,12 @@
 
     <script>
         const tg = window.Telegram?.WebApp;
-        if (tg) { try { tg.ready(); tg.expand(); } catch(e) {} }
+        if (tg) { 
+            try { 
+                tg.ready(); 
+                tg.expand();
+            } catch(e) {} 
+        }
 
         function showAppDialog(msg) {
             if (tg && tg.showAlert) {
@@ -299,6 +281,7 @@
         let isSpeakingNow = false;
         let myPhotoUrl = "";
         let localAudioTrack = null;
+        let isMicBusy = false; // Lock to prevent multiple permission loops
 
         let currentChatId = "";
         let amIBotOwner = false;
@@ -306,7 +289,7 @@
         let amIHardLocked = false;
         let participantStates = {};
         let userVolumes = {};
-        let activeSpeakerIds = new Set(); // Real-time speaking tracker
+        let activeSpeakerIds = new Set();
 
         let currentRoute = 'speaker';
         let cachedDevices = { bluetooth: null, speaker: null, earpiece: null };
@@ -336,9 +319,6 @@
 
         function getLiveKit() { return window.LivekitClient || window.livekit || window.LiveKit; }
 
-        // ==============================================================
-        // SINGLE-LINE 3D VERTICAL REEL SETUP
-        // ==============================================================
         const TOTAL_EMOJIS = 37;
         const PER_ROW = 7;
 
@@ -428,12 +408,8 @@
             });
 
             try {
-                room.localParticipant.publishData(new TextEncoder().encode(payload), {
-                    reliable: true
-                });
-            } catch (e) {
-                console.warn("Reaction error:", e);
-            }
+                room.localParticipant.publishData(new TextEncoder().encode(payload), { reliable: true });
+            } catch (e) {}
 
             displayFloatingRealisticReaction(myName, myPhotoUrl, emojiId);
             hideMessageDrawer();
@@ -502,7 +478,7 @@
         }
 
         // ==========================================
-        // HARDWARE AUDIO ROUTING
+        // HARDWARE AUDIO ROUTING (Non-Intrusive)
         // ==========================================
         async function refreshAudioDevices() {
             if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
@@ -535,9 +511,7 @@
 
                 updateRouteUI();
                 await applyHardwareRouting();
-            } catch(e) {
-                console.warn("Audio refresh:", e);
-            }
+            } catch(e) {}
         }
 
         async function cycleAudioRoute() {
@@ -623,14 +597,8 @@
             }
         }
 
-        if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
-            navigator.mediaDevices.addEventListener('devicechange', () => {
-                refreshAudioDevices();
-            });
-        }
-
         // ==========================================
-        // VOICE ROOM & LIVEKIT
+        // LIVEKIT SESSION & CLEAN USER RENDERING
         // ==========================================
         async function startVoiceSession() {
             const urlParams = new URLSearchParams(window.location.search);
@@ -680,9 +648,11 @@
                     publishDefaults: { dtx: false, red: true }
                 });
 
-                room.on(LK.RoomEvent.Disconnected, () => {
-                    showAppDialog("Voice Space session ended.");
-                    setTimeout(() => { if (tg && tg.close) tg.close(); else window.close(); }, 1000);
+                // Ignore sudden disconnections unless intentional
+                room.on(LK.RoomEvent.Disconnected, (reason) => {
+                    console.log("Disconnected reason:", reason);
+                    document.getElementById('connection-state').innerText = "Disconnected";
+                    document.getElementById('status-dot').className = "absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-rose-500 border-2 border-[#141a26] shrink-0";
                 });
 
                 room.on(LK.RoomEvent.TrackSubscribed, (track, pub, p) => {
@@ -694,7 +664,6 @@
                         audioEl.volume = savedVol / 100;
 
                         document.getElementById('remote-audio-container').appendChild(audioEl);
-                        
                         applyHardwareRouting();
                         audioEl.play().catch(() => {});
                     }
@@ -728,9 +697,7 @@
                                     amIHardLocked = true;
                                     if (localAudioTrack) {
                                         await localAudioTrack.mute();
-                                        if (localAudioTrack.mediaStreamTrack) {
-                                            localAudioTrack.mediaStreamTrack.enabled = false;
-                                        }
+                                        if (localAudioTrack.mediaStreamTrack) localAudioTrack.mediaStreamTrack.enabled = false;
                                     }
                                     isMuted = true;
                                     isSpeakingNow = false;
@@ -754,7 +721,6 @@
                 });
 
                 await room.connect(data.livekit_url, data.token);
-                await refreshAudioDevices();
 
                 document.getElementById('connection-state').innerText = "Connected";
                 document.getElementById('status-dot').className = "absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-[#141a26] shrink-0";
@@ -766,21 +732,27 @@
             }
         }
 
+        // ==========================================
+        // SINGLE-PROMPT LEAK-FREE MIC TOGGLE
+        // ==========================================
         async function toggleMic() {
-            if (!room) return;
+            if (!room || isMicBusy) return;
             if (amIHardLocked) {
                 return showAppDialog("An Administrator has locked your microphone.");
             }
 
+            isMicBusy = true;
             const LK = getLiveKit();
 
-            if (!localAudioTrack) {
-                try {
+            try {
+                if (!localAudioTrack) {
+                    // Pre-prompt Telegram write/mic access gracefully
                     localAudioTrack = await LK.createLocalAudioTrack({
                         echoCancellation: true,
                         noiseSuppression: true,
                         autoGainControl: true
                     });
+                    
                     await room.localParticipant.publishTrack(localAudioTrack);
                     isMuted = false;
                     
@@ -789,32 +761,33 @@
                     }
                     updateMicUI();
                     renderUsers();
-                    
-                    await refreshAudioDevices();
-                    return;
-                } catch (err) {
-                    showAppDialog("Microphone permission denied. Please allow mic access.");
+                    refreshAudioDevices(); // Detect Bluetooth without blocking
                     return;
                 }
-            }
 
-            if (isMuted) {
-                if (localAudioTrack.mediaStreamTrack) {
-                    localAudioTrack.mediaStreamTrack.enabled = true;
+                if (isMuted) {
+                    if (localAudioTrack.mediaStreamTrack) {
+                        localAudioTrack.mediaStreamTrack.enabled = true;
+                    }
+                    await localAudioTrack.unmute();
+                    isMuted = false;
+                } else {
+                    if (localAudioTrack.mediaStreamTrack) {
+                        localAudioTrack.mediaStreamTrack.enabled = false;
+                    }
+                    await localAudioTrack.mute();
+                    isMuted = true;
+                    isSpeakingNow = false;
                 }
-                await localAudioTrack.unmute();
-                isMuted = false;
-            } else {
-                if (localAudioTrack.mediaStreamTrack) {
-                    localAudioTrack.mediaStreamTrack.enabled = false;
-                }
-                await localAudioTrack.mute();
-                isMuted = true;
-                isSpeakingNow = false;
-            }
 
-            updateMicUI();
-            renderUsers();
+                updateMicUI();
+                renderUsers();
+            } catch (err) {
+                console.error("Mic access error:", err);
+                showAppDialog("Microphone permission denied. Please allow microphone access in Telegram / Phone App settings.");
+            } finally {
+                isMicBusy = false;
+            }
         }
 
         function updateMicUI() {
@@ -846,20 +819,23 @@
         }
 
         // ==============================================================
-        // TELEGRAM EXACT NATIVE MIC STATES (4 Clean Distinguishable Styles)
+        // RELIABLE TELEGRAM PARTICIPANTS RENDER (No disappearing users)
         // ==============================================================
         function renderUsers() {
             if (!room) return;
             const grid = document.getElementById('grid');
             grid.innerHTML = "";
+
             const participants = [room.localParticipant, ...Array.from(room.remoteParticipants.values())];
             document.getElementById('participant-count').innerText = participants.length;
 
             participants.forEach(p => {
                 let meta = {};
-                try { meta = JSON.parse(p.metadata || "{}"); } catch(e) {}
-                const state = participantStates[p.identity] || { is_muted: meta.is_muted };
+                try { 
+                    if (p.metadata) meta = JSON.parse(p.metadata); 
+                } catch(e) {}
 
+                const state = participantStates[p.identity] || { is_muted: meta.is_muted };
                 if (p === room.localParticipant && meta.photo_url) myPhotoUrl = meta.photo_url;
 
                 const isHardMuted = Boolean(state.is_muted);
@@ -895,30 +871,22 @@
                 }
                 bubble.appendChild(imgBox);
 
-                // BOT OWNER KO CHHOD KAR TELEGRAM NATIVE MIC BADGE
+                // Telegram Native Mic Badge (Bot Owner excluded)
                 if (!meta.is_owner) {
                     const badge = document.createElement('div');
                     badge.className = "absolute -bottom-1 -right-1 rounded-full p-1 border-2 border-white dark:border-[#0c1017] shadow-lg flex items-center justify-center tg-mic-badge";
 
                     if (isHardMuted) {
-                        // 1. ADMIN LOCKED (Red with Slash - Jaise opus . s)
                         badge.className += " bg-rose-600 text-white";
-                        badge.title = "Muted by Admin";
                         badge.innerHTML = `<svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.12c0-.04.02-.08.02-.12V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.94zM4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.33 3 2.99 3 .22 0 .44-.03.65-.08l1.66 1.66c-.71.33-1.5.52-2.31.52-2.76 0-5.3-2.1-5.3-5.1H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c.91-.13 1.77-.45 2.54-.9L19.73 21 21 19.73 4.27 3z"/></svg>`;
                     } else if (isTalking) {
-                        // 2. ACTIVE SPEAKING (Green with Pulse - Jaise PANDA)
                         badge.className += " bg-emerald-500 text-white shadow-emerald-500/50";
-                        badge.title = "Speaking Now";
                         badge.innerHTML = `<svg class="w-3 h-3 animate-pulse" fill="currentColor" viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>`;
                     } else if (isMicOn) {
-                        // 3. UNMUTED BUT SILENT (Clean Outline/White Mic - Jaise Crazyboy)
                         badge.className += " bg-slate-700/90 text-slate-100 border border-white/20";
-                        badge.title = "Unmuted (Silent)";
                         badge.innerHTML = `<svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>`;
                     } else {
-                        // 4. USER SELF MUTED (Dark Grey with Slash - Jaise this is you)
                         badge.className += " bg-slate-800/90 text-slate-400 border border-white/10";
-                        badge.title = "Muted by Self";
                         badge.innerHTML = `<svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.12c0-.04.02-.08.02-.12V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.94zM4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.33 3 2.99 3 .22 0 .44-.03.65-.08l1.66 1.66c-.71.33-1.5.52-2.31.52-2.76 0-5.3-2.1-5.3-5.1H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c.91-.13 1.77-.45 2.54-.9L19.73 21 21 19.73 4.27 3z"/></svg>`;
                     }
 
@@ -1074,9 +1042,7 @@
         async function leaveSpace() {
             if (localAudioTrack) {
                 try {
-                    if (localAudioTrack.mediaStreamTrack) {
-                        localAudioTrack.mediaStreamTrack.enabled = false;
-                    }
+                    if (localAudioTrack.mediaStreamTrack) localAudioTrack.mediaStreamTrack.enabled = false;
                     await localAudioTrack.mute();
                 } catch(e) {}
             }
@@ -1100,7 +1066,10 @@
             let attempts = 0;
             const t = setInterval(() => {
                 attempts++;
-                if (getLiveKit() || attempts > 25) { clearInterval(t); startVoiceSession(); }
+                if (getLiveKit() || attempts > 25) { 
+                    clearInterval(t); 
+                    startVoiceSession(); 
+                }
             }, 100);
         });
     </script>
