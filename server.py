@@ -27,13 +27,11 @@ OWNER_IDS = [int(x.strip()) for x in raw_owners.split(",") if x.strip().isdigit(
 
 app = FastAPI()
 
-# Microphone Permission Policy Middleware for Telegram In-App WebView
-# In server.py
-
+# Microphone Only Permission Header (Camera removed completely)
 @app.middleware("http")
 async def add_permission_headers(request, call_next):
     response = await call_next(request)
-    response.headers["Permissions-Policy"] = "microphone=*, camera=*"
+    response.headers["Permissions-Policy"] = "microphone=(self)"
     response.headers["Access-Control-Allow-Origin"] = "*"
     return response
 
@@ -343,3 +341,4 @@ async def end_room(req: EndRoomRequest):
         await lk_api.aclose()
 
     return {"status": "ok"}
+    
