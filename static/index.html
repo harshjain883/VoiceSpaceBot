@@ -48,7 +48,6 @@
             scroll-snap-type: y mandatory;
             scrollbar-width: none;
             -ms-overflow-style: none;
-            perspective: 600px;
         }
         .single-line-carousel::-webkit-scrollbar { display: none; }
 
@@ -112,9 +111,9 @@
 </head>
 <body class="h-screen flex flex-col justify-between p-4 select-none relative overflow-hidden" onclick="handleBodyClick(event)">
 
-    <div id="remote-audio-container" class="hidden"></div>
+    <!-- Never use display:none on audio container to prevent mobile browser audio sleep -->
+    <div id="remote-audio-container" style="position: absolute; width: 0; height: 0; overflow: hidden; opacity: 0; pointer-events: none;"></div>
 
-    <!-- Header Bar With Group Picture & Title -->
     <header class="glass-panel p-2.5 px-3.5 rounded-2xl flex items-center justify-between shadow-xl relative z-10">
         <div class="flex items-center gap-3 overflow-hidden">
             <div id="group-avatar-container" class="relative w-9 h-9 rounded-full overflow-hidden shrink-0 border border-white/15 shadow-sm bg-slate-800 flex items-center justify-center">
@@ -142,10 +141,8 @@
         <div id="grid" class="w-full h-full max-h-[46vh] grid grid-cols-3 gap-y-6 gap-x-4 auto-rows-max overflow-y-auto px-2 items-start justify-center"></div>
     </main>
 
-    <!-- Floating Live Chat Messages -->
     <div id="live-chat-overlay" class="absolute bottom-28 left-4 right-4 z-20 flex flex-col items-center justify-end space-y-2 pointer-events-none max-h-44 overflow-hidden"></div>
 
-    <!-- COMBINED MESSAGE & 3D SINGLE-LINE VERTICAL REEL DRAWER -->
     <div id="message-drawer" class="hidden absolute bottom-24 left-4 right-4 z-30 flex flex-col gap-2 pointer-events-auto">
         <div class="w-full max-w-sm mx-auto px-1">
             <div class="glass-panel rounded-full shadow-lg border border-white/10 px-3 py-1">
@@ -161,7 +158,6 @@
 
     <div id="error-banner" class="hidden glass-pill bg-rose-500/20 text-rose-400 text-xs px-4 py-2 rounded-xl text-center mb-2 relative z-10 mx-auto max-w-xs shadow-lg"></div>
 
-    <!-- Bottom Dock Controls -->
     <footer class="aesthetic-dock w-full max-w-sm mx-auto px-4 py-3 flex items-center justify-between relative z-10 mb-2">
         <div class="flex flex-col items-center gap-1.5 flex-1">
             <button id="spk-btn" onclick="cycleAudioRoute()" class="w-12 h-12 rounded-full bg-sky-500/15 dark:bg-sky-400/20 text-sky-600 dark:text-sky-400 border border-sky-500/30 flex items-center justify-center shadow-sm active:scale-90 transition">
@@ -206,7 +202,6 @@
         </div>
     </footer>
 
-    <!-- Custom Modal -->
     <div id="custom-app-dialog" class="hidden fixed inset-0 z-50 bg-black/65 backdrop-blur-sm flex items-center justify-center p-5">
         <div class="glass-panel p-5 rounded-3xl max-w-xs w-full text-left space-y-3 shadow-2xl border border-white/10">
             <div class="flex items-center justify-between">
@@ -280,8 +275,7 @@
         let isMuted = true;
         let isSpeakingNow = false;
         let myPhotoUrl = "";
-        let localAudioTrack = null;
-        let isMicBusy = false; // Lock to prevent multiple permission loops
+        let isMicBusy = false;
 
         let currentChatId = "";
         let amIBotOwner = false;
@@ -308,7 +302,9 @@
 
         function resumeAudioContext() {
             getAudioContext();
-            document.querySelectorAll('audio').forEach(a => { if (a.paused && a.srcObject) a.play().catch(() => {}); });
+            document.querySelectorAll('#remote-audio-container audio').forEach(a => { 
+                if (a.paused) a.play().catch(() => {}); 
+            });
         }
 
         function showError(msg) {
@@ -328,7 +324,6 @@
             container.innerHTML = "";
 
             let currentRow = null;
-
             for (let i = 1; i <= TOTAL_EMOJIS; i++) {
                 if ((i - 1) % PER_ROW === 0) {
                     currentRow = document.createElement('div');
@@ -478,7 +473,7 @@
         }
 
         // ==========================================
-        // HARDWARE AUDIO ROUTING (Non-Intrusive)
+        // AUDIO DEVICE ROUTING
         // ==========================================
         async function refreshAudioDevices() {
             if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
@@ -598,7 +593,7 @@
         }
 
         // ==========================================
-        // LIVEKIT SESSION & CLEAN USER RENDERING
+        // LIVEKIT CONNECTION & EVENT HANDLING
         // ==========================================
         async function startVoiceSession() {
             const urlParams = new URLSearchParams(window.location.search);
@@ -648,17 +643,11 @@
                     publishDefaults: { dtx: false, red: true }
                 });
 
-                // Ignore sudden disconnections unless intentional
-                room.on(LK.RoomEvent.Disconnected, (reason) => {
-                    console.log("Disconnected reason:", reason);
-                    document.getElementById('connection-state').innerText = "Disconnected";
-                    document.getElementById('status-dot').className = "absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-rose-500 border-2 border-[#141a26] shrink-0";
-                });
-
                 room.on(LK.RoomEvent.TrackSubscribed, (track, pub, p) => {
                     if (track.kind === LK.Track.Kind.Audio) {
                         const audioEl = track.attach();
                         audioEl.id = `audio-${p.identity}`;
+                        audioEl.autoplay = true;
                         
                         const savedVol = userVolumes[p.identity] !== undefined ? userVolumes[p.identity] : 100;
                         audioEl.volume = savedVol / 100;
@@ -695,10 +684,7 @@
                             if (msg.targetId === myId) {
                                 if (msg.state.is_muted) {
                                     amIHardLocked = true;
-                                    if (localAudioTrack) {
-                                        await localAudioTrack.mute();
-                                        if (localAudioTrack.mediaStreamTrack) localAudioTrack.mediaStreamTrack.enabled = false;
-                                    }
+                                    await room.localParticipant.setMicrophoneEnabled(false);
                                     isMuted = true;
                                     isSpeakingNow = false;
                                     updateMicUI();
@@ -724,6 +710,8 @@
 
                 document.getElementById('connection-state').innerText = "Connected";
                 document.getElementById('status-dot').className = "absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-[#141a26] shrink-0";
+                
+                isMuted = true;
                 updateMicUI();
                 renderUsers();
 
@@ -733,7 +721,7 @@
         }
 
         // ==========================================
-        // SINGLE-PROMPT LEAK-FREE MIC TOGGLE
+        // OFFICIAL BULLETPROOF MIC TOGGLE
         // ==========================================
         async function toggleMic() {
             if (!room || isMicBusy) return;
@@ -742,40 +730,23 @@
             }
 
             isMicBusy = true;
-            const LK = getLiveKit();
 
             try {
-                if (!localAudioTrack) {
-                    // Pre-prompt Telegram write/mic access gracefully
-                    localAudioTrack = await LK.createLocalAudioTrack({
-                        echoCancellation: true,
-                        noiseSuppression: true,
-                        autoGainControl: true
-                    });
-                    
-                    await room.localParticipant.publishTrack(localAudioTrack);
-                    isMuted = false;
-                    
-                    if (localAudioTrack.mediaStreamTrack) {
-                        localAudioTrack.mediaStreamTrack.enabled = true;
-                    }
-                    updateMicUI();
-                    renderUsers();
-                    refreshAudioDevices(); // Detect Bluetooth without blocking
-                    return;
-                }
-
                 if (isMuted) {
-                    if (localAudioTrack.mediaStreamTrack) {
-                        localAudioTrack.mediaStreamTrack.enabled = true;
+                    // Turn ON mic using LiveKit official engine with fallback
+                    try {
+                        await room.localParticipant.setMicrophoneEnabled(true);
+                    } catch (primaryErr) {
+                        console.warn("Primary mic failed, trying direct getUserMedia:", primaryErr);
+                        const fallbackStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                        const track = fallbackStream.getAudioTracks()[0];
+                        await room.localParticipant.publishTrack(track);
                     }
-                    await localAudioTrack.unmute();
                     isMuted = false;
+                    refreshAudioDevices();
                 } else {
-                    if (localAudioTrack.mediaStreamTrack) {
-                        localAudioTrack.mediaStreamTrack.enabled = false;
-                    }
-                    await localAudioTrack.mute();
+                    // Turn OFF mic completely (no leak)
+                    await room.localParticipant.setMicrophoneEnabled(false);
                     isMuted = true;
                     isSpeakingNow = false;
                 }
@@ -783,8 +754,10 @@
                 updateMicUI();
                 renderUsers();
             } catch (err) {
-                console.error("Mic access error:", err);
-                showAppDialog("Microphone permission denied. Please allow microphone access in Telegram / Phone App settings.");
+                console.error("Mic toggle error:", err);
+                if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                    showAppDialog("Microphone permission denied. Please allow microphone access in Telegram / Phone App settings.");
+                }
             } finally {
                 isMicBusy = false;
             }
@@ -819,87 +792,91 @@
         }
 
         // ==============================================================
-        // RELIABLE TELEGRAM PARTICIPANTS RENDER (No disappearing users)
+        // SAFE & CRASH-PROOF MEMBER RENDERING
         // ==============================================================
         function renderUsers() {
             if (!room) return;
             const grid = document.getElementById('grid');
             grid.innerHTML = "";
 
-            const participants = [room.localParticipant, ...Array.from(room.remoteParticipants.values())];
+            // Gather all participants safely
+            const participants = [];
+            if (room.localParticipant) participants.push(room.localParticipant);
+            if (room.remoteParticipants) {
+                room.remoteParticipants.forEach(rp => participants.push(rp));
+            }
+
             document.getElementById('participant-count').innerText = participants.length;
 
             participants.forEach(p => {
-                let meta = {};
-                try { 
-                    if (p.metadata) meta = JSON.parse(p.metadata); 
-                } catch(e) {}
-
-                const state = participantStates[p.identity] || { is_muted: meta.is_muted };
-                if (p === room.localParticipant && meta.photo_url) myPhotoUrl = meta.photo_url;
-
-                const isHardMuted = Boolean(state.is_muted);
-                let isMicOn = false;
-
-                if (p === room.localParticipant) {
-                    isMicOn = !isMuted && !isHardMuted;
-                } else {
-                    const audioPub = Array.from(p.audioTracks.values())[0];
-                    isMicOn = Boolean(audioPub && !audioPub.isMuted && !isHardMuted);
-                }
-
-                const isTalking = activeSpeakerIds.has(String(p.identity)) && isMicOn;
-
-                const card = document.createElement('div');
-                card.className = "flex flex-col items-center gap-1.5 cursor-pointer";
-                card.onclick = () => openProfileModal(p, meta, state);
-
-                const bubble = document.createElement('div');
-                bubble.id = `user-${p.identity}`;
-                bubble.className = `relative w-16 h-16 rounded-full border-2 ${meta.is_owner ? 'border-amber-400' : (meta.is_admin ? 'border-sky-400' : 'border-slate-300 dark:border-white/10')} flex items-center justify-center bg-slate-200 dark:bg-slate-800 overflow-visible shadow-md`;
-
-                if (isTalking) {
-                    bubble.classList.add('speaking-ring');
-                }
-
-                const imgBox = document.createElement('div');
-                imgBox.className = "w-full h-full rounded-full overflow-hidden flex items-center justify-center";
-                if (meta.photo_url) {
-                    imgBox.innerHTML = `<img src="${meta.photo_url}" class="w-full h-full object-cover">`;
-                } else {
-                    imgBox.innerHTML = `<span class="font-bold text-base bg-gradient-to-tr from-pink-500 to-indigo-500 bg-clip-text text-transparent">${(p.name || "U")[0].toUpperCase()}</span>`;
-                }
-                bubble.appendChild(imgBox);
-
-                // Telegram Native Mic Badge (Bot Owner excluded)
-                if (!meta.is_owner) {
-                    const badge = document.createElement('div');
-                    badge.className = "absolute -bottom-1 -right-1 rounded-full p-1 border-2 border-white dark:border-[#0c1017] shadow-lg flex items-center justify-center tg-mic-badge";
-
-                    if (isHardMuted) {
-                        badge.className += " bg-rose-600 text-white";
-                        badge.innerHTML = `<svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.12c0-.04.02-.08.02-.12V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.94zM4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.33 3 2.99 3 .22 0 .44-.03.65-.08l1.66 1.66c-.71.33-1.5.52-2.31.52-2.76 0-5.3-2.1-5.3-5.1H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c.91-.13 1.77-.45 2.54-.9L19.73 21 21 19.73 4.27 3z"/></svg>`;
-                    } else if (isTalking) {
-                        badge.className += " bg-emerald-500 text-white shadow-emerald-500/50";
-                        badge.innerHTML = `<svg class="w-3 h-3 animate-pulse" fill="currentColor" viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>`;
-                    } else if (isMicOn) {
-                        badge.className += " bg-slate-700/90 text-slate-100 border border-white/20";
-                        badge.innerHTML = `<svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>`;
-                    } else {
-                        badge.className += " bg-slate-800/90 text-slate-400 border border-white/10";
-                        badge.innerHTML = `<svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.12c0-.04.02-.08.02-.12V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.94zM4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.33 3 2.99 3 .22 0 .44-.03.65-.08l1.66 1.66c-.71.33-1.5.52-2.31.52-2.76 0-5.3-2.1-5.3-5.1H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c.91-.13 1.77-.45 2.54-.9L19.73 21 21 19.73 4.27 3z"/></svg>`;
+                try {
+                    let meta = {};
+                    if (p.metadata) {
+                        try { meta = JSON.parse(p.metadata); } catch(e) {}
                     }
 
-                    bubble.appendChild(badge);
+                    const state = participantStates[p.identity] || { is_muted: meta.is_muted };
+                    if (p === room.localParticipant && meta.photo_url) myPhotoUrl = meta.photo_url;
+
+                    const isHardMuted = Boolean(state.is_muted);
+                    
+                    // Native LiveKit mic status (100% crash proof)
+                    const isMicOn = Boolean(p.isMicrophoneEnabled && !isHardMuted);
+                    const isTalking = Boolean(activeSpeakerIds.has(String(p.identity)) || (p.isSpeaking && isMicOn));
+
+                    const card = document.createElement('div');
+                    card.className = "flex flex-col items-center gap-1.5 cursor-pointer";
+                    card.onclick = () => openProfileModal(p, meta, state);
+
+                    const bubble = document.createElement('div');
+                    bubble.id = `user-${p.identity}`;
+                    bubble.className = `relative w-16 h-16 rounded-full border-2 ${meta.is_owner ? 'border-amber-400' : (meta.is_admin ? 'border-sky-400' : 'border-slate-300 dark:border-white/10')} flex items-center justify-center bg-slate-200 dark:bg-slate-800 overflow-visible shadow-md`;
+
+                    if (isTalking) {
+                        bubble.classList.add('speaking-ring');
+                    }
+
+                    const imgBox = document.createElement('div');
+                    imgBox.className = "w-full h-full rounded-full overflow-hidden flex items-center justify-center";
+                    if (meta.photo_url) {
+                        imgBox.innerHTML = `<img src="${meta.photo_url}" class="w-full h-full object-cover">`;
+                    } else {
+                        imgBox.innerHTML = `<span class="font-bold text-base bg-gradient-to-tr from-pink-500 to-indigo-500 bg-clip-text text-transparent">${(p.name || "U")[0].toUpperCase()}</span>`;
+                    }
+                    bubble.appendChild(imgBox);
+
+                    // Telegram Native Mic Badge (Bot Owner excluded)
+                    if (!meta.is_owner) {
+                        const badge = document.createElement('div');
+                        badge.className = "absolute -bottom-1 -right-1 rounded-full p-1 border-2 border-white dark:border-[#0c1017] shadow-lg flex items-center justify-center tg-mic-badge";
+
+                        if (isHardMuted) {
+                            badge.className += " bg-rose-600 text-white";
+                            badge.innerHTML = `<svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.12c0-.04.02-.08.02-.12V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.94zM4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.33 3 2.99 3 .22 0 .44-.03.65-.08l1.66 1.66c-.71.33-1.5.52-2.31.52-2.76 0-5.3-2.1-5.3-5.1H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c.91-.13 1.77-.45 2.54-.9L19.73 21 21 19.73 4.27 3z"/></svg>`;
+                        } else if (isTalking) {
+                            badge.className += " bg-emerald-500 text-white shadow-emerald-500/50";
+                            badge.innerHTML = `<svg class="w-3 h-3 animate-pulse" fill="currentColor" viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>`;
+                        } else if (isMicOn) {
+                            badge.className += " bg-slate-700/90 text-slate-100 border border-white/20";
+                            badge.innerHTML = `<svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>`;
+                        } else {
+                            badge.className += " bg-slate-800/90 text-slate-400 border border-white/10";
+                            badge.innerHTML = `<svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.12c0-.04.02-.08.02-.12V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.94zM4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.33 3 2.99 3 .22 0 .44-.03.65-.08l1.66 1.66c-.71.33-1.5.52-2.31.52-2.76 0-5.3-2.1-5.3-5.1H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c.91-.13 1.77-.45 2.54-.9L19.73 21 21 19.73 4.27 3z"/></svg>`;
+                        }
+
+                        bubble.appendChild(badge);
+                    }
+
+                    const label = document.createElement('span');
+                    label.className = "text-[11px] font-semibold truncate max-w-[75px] text-center text-slate-800 dark:text-slate-200";
+                    label.innerText = p.name || `User ${p.identity}`;
+
+                    card.appendChild(bubble);
+                    card.appendChild(label);
+                    grid.appendChild(card);
+                } catch(err) {
+                    console.error("Error rendering user card:", err);
                 }
-
-                const label = document.createElement('span');
-                label.className = "text-[11px] font-semibold truncate max-w-[75px] text-center text-slate-800 dark:text-slate-200";
-                label.innerText = p.name || `User ${p.identity}`;
-
-                card.appendChild(bubble);
-                card.appendChild(label);
-                grid.appendChild(card);
             });
         }
 
@@ -1040,14 +1017,11 @@
         }
 
         async function leaveSpace() {
-            if (localAudioTrack) {
-                try {
-                    if (localAudioTrack.mediaStreamTrack) localAudioTrack.mediaStreamTrack.enabled = false;
-                    await localAudioTrack.mute();
-                } catch(e) {}
-            }
             if (room) {
-                await room.disconnect();
+                try {
+                    await room.localParticipant.setMicrophoneEnabled(false);
+                    await room.disconnect();
+                } catch(e) {}
             }
             if (tg && tg.close) {
                 tg.close();
